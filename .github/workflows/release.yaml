@@ -29,9 +29,6 @@ jobs:
           - os: linux
             arch: amd64
             target: archive
-          - os: linux
-            arch: amd64
-            target: sycl
     runs-on: ubuntu-latest
     environment: release
     needs: setup-environment
@@ -87,6 +84,14 @@ jobs:
               CGO_CFLAGS
               CGO_CXXFLAGS
               GOFLAGS
+          - os: linux
+            arch: amd64
+            suffix: '-sycl'
+            build-args: |
+              CGO_CFLAGS
+              CGO_CXXFLAGS
+              GOFLAGS
+              FLAVOR=sycls
     runs-on: ubuntu-latest
     environment: release
     needs: [linux-build]
@@ -122,7 +127,7 @@ jobs:
   docker-merge-push:
     strategy:
       matrix:
-        suffix: ['']
+        suffix: ['','-sycl']
     runs-on: linux
     environment: release
     needs: [docker-build-push]
