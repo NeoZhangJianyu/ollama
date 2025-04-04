@@ -3,8 +3,8 @@
 export VERSION=${VERSION:-$(git describe --tags --first-parent --abbrev=7 --long --dirty --always | sed -e "s/^v//g")}
 export GOFLAGS="'-ldflags=-w -s \"-X=github.com/ollama/ollama/version.Version=$VERSION\" \"-X=github.com/ollama/ollama/server.mode=release\"'"
 # TODO - consider `docker buildx ls --format=json` to autodiscover platform capability
-#PLATFORM=${PLATFORM:-"linux/arm64,linux/amd64,,linux/intel"}
-PLATFORM=${PLATFORM:-"linux/intel"}
+#PLATFORM=${PLATFORM:-"linux/arm64,linux/amd64"}
+PLATFORM=${PLATFORM:-"linux/amd64"}
 DOCKER_ORG=${DOCKER_ORG:-"ollama"}
 FINAL_IMAGE_REPO=${FINAL_IMAGE_REPO:-"${DOCKER_ORG}/ollama"}
 OLLAMA_COMMON_BUILD_ARGS="--build-arg=VERSION \

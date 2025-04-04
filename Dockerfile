@@ -14,6 +14,8 @@ ARG INTEL_DL_ESS=2025.1.0-0-devel-ubuntu24.04
 ## Build Image
 
 FROM intel/deep-learning-essentials:$INTEL_DL_ESS AS base
+ENV http_proxy=http://proxy.ims.intel.com:911
+ENV https_proxy=http://proxy.ims.intel.com:911
 ARG TARGETARCH
 RUN echo "TARGETARCH ${TARGETARCH}"
 
@@ -79,27 +81,28 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -buildmode=pie -o /bin/ollama .
 
 # FROM --platform=linux/amd64 scratch AS amd64
+# COPY --from=sycl dist/lib/ollama/sycl /lib/ollama/sycl
+
+
+# FROM base AS archive
+FROM --platform=linux/${FLAVOR} scratch AS archive
+# RUN echo "archive"
+COPY --from=cpu dist/lib/ollama /lib/ollama
+COPY --from=build /bin/ollama /bin/ollama
 COPY --from=sycl dist/lib/ollama/sycl /lib/ollama/sycl
 
-
-FROM base AS archive
-
-RUN echo "archive"
-COPY --from=cpu dist/lib/ollama /lib/ollama
-# COPY --from=build /bin/ollama /bin/ollama
-
-FROM base AS app
-RUN echo "from base"
-# COPY --from=archive /bin /usr/bin
-# ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-COPY --from=archive /lib/ollama /usr/lib/ollama
-# #ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
-ENV ONEAPI_DEVICE_SELECTOR="level_zero:0"
-# #ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-# #ENV NVIDIA_VISIBLE_DEVICES=all
-ENV OLLAMA_HOST=0.0.0.0:11434
-EXPOSE 11434
-ENTRYPOINT ["/bin/ollama"]
-CMD ["serve"]
+# FROM base AS app
+# RUN echo "from base"
+# # COPY --from=archive /bin /usr/bin
+# # ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# COPY --from=archive /lib/ollama /usr/lib/ollama
+# # #ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+# ENV ONEAPI_DEVICE_SELECTOR="level_zero:0"
+# # #ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+# # #ENV NVIDIA_VISIBLE_DEVICES=all
+# ENV OLLAMA_HOST=0.0.0.0:11434
+# EXPOSE 11434
+# ENTRYPOINT ["/bin/ollama"]
+# CMD ["serve"]
 
 # ENTRYPOINT ["/bin/bash"]
