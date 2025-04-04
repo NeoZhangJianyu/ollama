@@ -76,7 +76,7 @@ jobs:
   # Aggregate all the assets and ship a release
   release:
     needs: [linux-build]
-    runs-on: linux
+    runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: write
