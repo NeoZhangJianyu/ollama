@@ -30,14 +30,8 @@ jobs:
             arch: amd64
             target: archive
           - os: linux
-            arch: amd64
-            target: rocm
-          - os: linux
             arch: intel
             target: sycl
-          - os: linux
-            arch: arm64
-            target: archive
     runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
     environment: release
     needs: setup-environment
