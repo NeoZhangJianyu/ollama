@@ -1,0 +1,12 @@
+diff --git a/src/ggml-sycl/ggml-sycl.cpp b/src/ggml-sycl/ggml-sycl.cpp
+index 39d53da..c591e70 100644
+--- a/src/ggml-sycl/ggml-sycl.cpp
++++ b/src/ggml-sycl/ggml-sycl.cpp
+@@ -316,6 +316,7 @@ ggml_backend_sycl_buffer_free_buffer(ggml_backend_buffer_t buffer) try {
+     ggml_sycl_set_device(ctx->device);
+ 
+     delete ctx;
++    delete buffer;
+ }
+ catch (sycl::exception const &exc) {
+   std::cerr << exc.what() << "Exception caught at file:" << __FILE__
