@@ -4,6 +4,7 @@
 #
 # docker context create amd64 --docker host=ssh://mybuildhost
 # docker buildx create --name mybuilder amd64 --platform linux/amd64
+# docker buildx create --name mybuilder intel --platform linux/intel
 # docker buildx create --name mybuilder --append desktop-linux --platform linux/arm64
 # docker buildx use mybuilder
 
@@ -37,6 +38,21 @@ if echo $PLATFORM | grep "amd64" > /dev/null; then
         .
 fi
 
+if echo $PLATFORM | grep "intel" > /dev/null; then
+    outDir="./dist"
+    if echo $PLATFORM | grep "," > /dev/null ; then
+       outDir="./dist/linux_intel"
+    fi
+    docker buildx build \
+        --output type=local,dest=${outDir} \
+        --platform=linux/intel \
+        ${OLLAMA_COMMON_BUILD_ARGS} \
+        --build-arg FLAVOR=sycl \
+        --target archive \
+        --progress=plain \
+        -f Dockerfile \
+        .
+fi
 # buildx behavior changes for single vs. multiplatform
 echo "Compressing linux tar bundles..."
 if echo $PLATFORM | grep "," > /dev/null ; then
@@ -45,6 +61,8 @@ if echo $PLATFORM | grep "," > /dev/null ; then
         tar c -C ./dist/linux_arm64 ./lib/ollama/cuda_jetpack6  | pigz -9vc >./dist/ollama-linux-arm64-jetpack6.tgz
         tar c -C ./dist/linux_amd64 --exclude rocm . | pigz -9vc >./dist/ollama-linux-amd64.tgz
         tar c -C ./dist/linux_amd64 ./lib/ollama/rocm  | pigz -9vc >./dist/ollama-linux-amd64-rocm.tgz
+        tar c -C ./dist/linux_intel --exclude sycl bin lib | pigz -9vc >./dist/ollama-linux-intel.tgz
+        tar c -C ./dist/linux_intel ./lib/ollama/sycl  | pigz -9vc >./dist/ollama-linux-intel-sycl.tgz
 elif echo $PLATFORM | grep "arm64" > /dev/null ; then
         tar c -C ./dist/ --exclude cuda_jetpack5 --exclude cuda_jetpack6 bin lib | pigz -9vc >./dist/ollama-linux-arm64.tgz
         tar c -C ./dist/ ./lib/ollama/cuda_jetpack5  | pigz -9vc >./dist/ollama-linux-arm64-jetpack5.tgz
@@ -52,4 +70,8 @@ elif echo $PLATFORM | grep "arm64" > /dev/null ; then
 elif echo $PLATFORM | grep "amd64" > /dev/null ; then
         tar c -C ./dist/ --exclude rocm bin lib | pigz -9vc >./dist/ollama-linux-amd64.tgz
         tar c -C ./dist/ ./lib/ollama/rocm  | pigz -9vc >./dist/ollama-linux-amd64-rocm.tgz
+elif echo $PLATFORM | grep "intel" > /dev/null ; then
+        tar c -C ./dist/ --exclude sycl bin lib | pigz -9vc >./dist/ollama-linux-intel.tgz
+        tar c -C ./dist/ ./lib/ollama/sycl  | pigz -9vc >./dist/ollama-linux-intel-sycl.tgz
+
 fi

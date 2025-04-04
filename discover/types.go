@@ -85,12 +85,12 @@ type RocmGPUInfo struct {
 }
 type RocmGPUInfoList []RocmGPUInfo
 
-type OneapiGPUInfo struct {
+type SyclGPUInfo struct {
 	GpuInfo
 	driverIndex int //nolint:unused,nolintlint
 	gpuIndex    int //nolint:unused,nolintlint
 }
-type OneapiGPUInfoList []OneapiGPUInfo
+type SyclGPUInfoList []SyclGPUInfo
 
 type GpuInfoList []GpuInfo
 

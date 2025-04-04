@@ -7,12 +7,13 @@ import (
 	"strings"
 )
 
-func oneapiGetVisibleDevicesEnv(gpuInfo []GpuInfo) (string, string) {
+func syclGetVisibleDevicesEnv(gpuInfo []GpuInfo) (string, string) {
 	ids := []string{}
+	slog.Info("gpuinfo","len", len(gpuInfo))
 	for _, info := range gpuInfo {
-		if info.Library != "oneapi" {
+		if info.Library != "sycl" {
 			// TODO shouldn't happen if things are wired correctly...
-			slog.Debug("oneapiGetVisibleDevicesEnv skipping over non-sycl device", "library", info.Library)
+			slog.Debug("syclGetVisibleDevicesEnv skipping over non-sycl device", "library", info.Library)
 			continue
 		}
 		ids = append(ids, info.ID)

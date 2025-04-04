@@ -154,7 +154,7 @@ typedef struct _zes_mem_state_t {
   uint64_t size;
 } zes_mem_state_t;
 
-typedef struct oneapi_handle {
+typedef struct sycl_handle {
   void *handle;
   uint16_t verbose;
 
@@ -181,23 +181,23 @@ typedef struct oneapi_handle {
   ze_result_t (*zesMemoryGetState)(zes_mem_handle_t hMemory,
                                    zes_mem_state_t *pState);
 
-} oneapi_handle_t;
+} sycl_handle_t;
 
-typedef struct oneapi_init_resp {
+typedef struct sycl_init_resp {
   char *err; // If err is non-null handle is invalid
-  oneapi_handle_t oh;
-} oneapi_init_resp_t;
+  sycl_handle_t oh;
+} sycl_init_resp_t;
 
-typedef struct oneapi_version_resp {
+typedef struct sycl_version_resp {
   ze_result_t status;
   char *str; // Contains version or error string if status != 0
-} oneapi_version_resp_t;
+} sycl_version_resp_t;
 
-void oneapi_init(char *oneapi_lib_path, oneapi_init_resp_t *resp);
-void oneapi_check_vram(oneapi_handle_t h, int driver, int device,
+void sycl_init(char *sycl_lib_path, sycl_init_resp_t *resp);
+void sycl_check_vram(sycl_handle_t h, int driver, int device,
                        mem_info_t *resp);
-void oneapi_release(oneapi_handle_t h);
-int oneapi_get_device_count(oneapi_handle_t h, int driver);
+void sycl_release(sycl_handle_t h);
+int sycl_get_device_count(sycl_handle_t h, int driver);
 
 #endif // __GPU_INFO_INTEL_H__
 #endif // __APPLE__

@@ -67,66 +67,52 @@ install(TARGETS ggml-base ${CPU_VARIANTS}
     FRAMEWORK DESTINATION ${OLLAMA_INSTALL_DIR} COMPONENT CPU
 )
 
-check_language(CUDA)
-if(CMAKE_CUDA_COMPILER)
-    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24" AND NOT CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "native")
-    endif()
+if (DEFINED ENV{ONEAPI_ROOT})
+    find_package(IntelSYCL REQUIRED)
+    message(STATUS ${CMAKE_C_COMPILER})
+    message(STATUS ${CMAKE_CXX_COMPILER})
 
-    find_package(CUDAToolkit)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-cuda)
-    set(OLLAMA_CUDA_INSTALL_DIR ${OLLAMA_INSTALL_DIR}/cuda_v${CUDAToolkit_VERSION_MAJOR})
-    install(TARGETS ggml-cuda
-        RUNTIME_DEPENDENCIES
-            DIRECTORIES ${CUDAToolkit_BIN_DIR} ${CUDAToolkit_LIBRARY_DIR}
-            PRE_INCLUDE_REGEXES cublas cublasLt cudart
-            PRE_EXCLUDE_REGEXES ".*"
-        RUNTIME DESTINATION ${OLLAMA_CUDA_INSTALL_DIR} COMPONENT CUDA
-        LIBRARY DESTINATION ${OLLAMA_CUDA_INSTALL_DIR} COMPONENT CUDA
-    )
-endif()
+    check_cxx_compiler_flag("-fsycl" SUPPORTS_SYCL)
+    if(SUPPORTS_SYCL)
+        message(STATUS "SYCL found")
+        set(SYCL_PLATFORM "intel")
 
-set(WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX "^gfx(906|908|90a|1200|1201):xnack[+-]$"
-    CACHE STRING
-    "Regular expression describing AMDGPU_TARGETS not supported on Windows. Override to force building these targets. Default \"^gfx(906|908|90a|1200|1201):xnack[+-]$\"."
-)
+        set(MKLROOT "$ENV{MKLROOT}")
+        set(CMPLR_ROOT "$ENV{CMPLR_ROOT}")
+        set(DNNLROOT "$ENV{DNNLROOT}")
+        set(TBBROOT "$ENV{TBBROOT}")
 
-check_language(HIP)
-if(CMAKE_HIP_COMPILER)
-    set(HIP_PLATFORM "amd")
+        #message(STATUS ${MKLROOT}/lib)
+        # message(STATUS ${DNNLROOT}/lib)
+        # message(STATUS ${TBBROOT}/lib)
 
-    find_package(hip REQUIRED)
-    if(NOT AMDGPU_TARGETS)
-        list(FILTER AMDGPU_TARGETS INCLUDE REGEX "^gfx(900|94[012]|101[02]|1030|110[012]|120[01])$")
-    elseif(WIN32 AND WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX)
-        list(FILTER AMDGPU_TARGETS EXCLUDE REGEX ${WINDOWS_AMDGPU_TARGETS_EXCLUDE_REGEX})
-    endif()
+        # message(STATUS "$ENV{LD_LIBRARY_PATH}")
 
-    if(AMDGPU_TARGETS)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ml/backend/ggml/ggml/src/ggml-hip)
+        set(OLLAMA_SYCL_INSTALL_DIR ${OLLAMA_INSTALL_DIR}/sycl)
 
-        if (WIN32)
-            target_compile_definitions(ggml-hip PRIVATE GGML_CUDA_NO_PEER_COPY)
-        endif()
-
-        target_compile_definitions(ggml-hip PRIVATE GGML_HIP_NO_VMM)
-
-        set(OLLAMA_HIP_INSTALL_DIR ${OLLAMA_INSTALL_DIR}/rocm)
-        install(TARGETS ggml-hip
+        install(TARGETS ggml-sycl
             RUNTIME_DEPENDENCIES
-                DIRECTORIES ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR}
-                PRE_INCLUDE_REGEXES hipblas rocblas amdhip64 rocsolver amd_comgr hsa-runtime64 rocsparse tinfo rocprofiler-register drm drm_amdgpu numa elf
+                DIRECTORIES ${TBBROOT}/lib/ ${DNNLROOT}/lib ${MKLROOT}/lib ${CMPLR_ROOT}/lib
+                PRE_INCLUDE_REGEXES  tbb dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread sycl imf svml irng  intlc ur_loader
                 PRE_EXCLUDE_REGEXES ".*"
-                POST_EXCLUDE_REGEXES "system32"
-            RUNTIME DESTINATION ${OLLAMA_HIP_INSTALL_DIR} COMPONENT HIP
-            LIBRARY DESTINATION ${OLLAMA_HIP_INSTALL_DIR} COMPONENT HIP
+                POST_EXCLUDE_REGEXES
+                    [=[.*system32\/.*\.dll]=]
+                    [=[^\/(lib|usr\/lib|usr\/local\/lib)]=]
+            RUNTIME DESTINATION ${OLLAMA_SYCL_INSTALL_DIR} COMPONENT SYCL
+            LIBRARY DESTINATION ${OLLAMA_SYCL_INSTALL_DIR} COMPONENT SYCL
+            FRAMEWORK DESTINATION ${OLLAMA_SYCL_INSTALL_DIR} COMPONENT SYCL
         )
 
-        foreach(HIP_LIB_BIN_INSTALL_DIR IN ITEMS ${HIP_BIN_INSTALL_DIR} ${HIP_LIB_INSTALL_DIR})
-            if(EXISTS ${HIP_LIB_BIN_INSTALL_DIR}/rocblas)
-                install(DIRECTORY ${HIP_LIB_BIN_INSTALL_DIR}/rocblas DESTINATION ${OLLAMA_HIP_INSTALL_DIR} COMPONENT HIP)
-                break()
-            endif()
-        endforeach()
+        file(COPY
+                ${TBBROOT}/lib/intel64/gcc4.8/libtbb.so
+                DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+                FOLLOW_SYMLINK_CHAIN
+              )
+    else()
+        message(FATAL_ERROR, "C++ compiler lacks SYCL support.")
     endif()
+else()
+    message(STATUS, "Skip to build SYCL, miss to detect SYCL support.")
 endif()
+
+

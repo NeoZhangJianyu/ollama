@@ -38,7 +38,7 @@ var NvcudaGlobs = []string{
 	"c:\\windows\\system*\\nvcuda.dll",
 }
 
-var OneapiGlobs = []string{
+var SyclGlobs = []string{
 	"c:\\Windows\\System32\\DriverStore\\FileRepository\\*\\ze_intel_gpu64.dll",
 }
 
@@ -46,7 +46,7 @@ var (
 	CudartMgmtName = "cudart64_*.dll"
 	NvcudaMgmtName = "nvcuda.dll"
 	NvmlMgmtName   = "nvml.dll"
-	OneapiMgmtName = "ze_intel_gpu64.dll"
+	SyclMgmtName = "ze_intel_gpu64.dll"
 )
 
 func GetCPUMem() (memInfo, error) {
