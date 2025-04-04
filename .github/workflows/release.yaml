@@ -32,7 +32,7 @@ jobs:
           - os: linux
             arch: intel
             target: sycl
-    runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
+    runs-on: ubuntu-latest
     environment: release
     needs: setup-environment
     env:
@@ -95,7 +95,7 @@ jobs:
               CGO_CXXFLAGS
               GOFLAGS
               FLAVOR=sycl
-    runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
+    runs-on: ubuntu-latest
     environment: release
     needs: [linux-build]
     env:
