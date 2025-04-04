@@ -84,7 +84,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 COPY --from=sycl dist/lib/ollama/sycl /lib/ollama/sycl
 
 
-
 FROM base AS archive
 
 RUN echo "archive"

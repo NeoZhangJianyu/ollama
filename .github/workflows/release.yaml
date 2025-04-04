@@ -33,7 +33,7 @@ jobs:
             arch: amd64
             target: rocm
           - os: linux
-            arch: amd64
+            arch: intel
             target: sycl
           - os: linux
             arch: arm64
@@ -94,7 +94,7 @@ jobs:
               CGO_CXXFLAGS
               GOFLAGS
           - os: linux
-            arch: amd64
+            arch: intel
             suffix: '-sycl'
             build-args: |
               CGO_CFLAGS
