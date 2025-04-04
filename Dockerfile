@@ -14,8 +14,6 @@ ARG INTEL_DL_ESS=2025.1.0-0-devel-ubuntu24.04
 ## Build Image
 
 FROM intel/deep-learning-essentials:$INTEL_DL_ESS AS base
-ENV http_proxy=http://proxy.ims.intel.com:911
-ENV https_proxy=http://proxy.ims.intel.com:911
 ARG TARGETARCH
 RUN echo "TARGETARCH ${TARGETARCH}"
 
@@ -44,8 +42,6 @@ RUN echo $(cmake --version)
     # cmake --build build --config Release -j
 
 # FROM ${TARGETARCH} AS base
-# ENV http_proxy http://proxy.ims.intel.com:911
-# ENV https_proxy http://proxy.ims.intel.com:911
 
 # ARG CMAKEVERSION
 # ARG TARGET_ARCH
