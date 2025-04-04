@@ -87,14 +87,6 @@ jobs:
               CGO_CFLAGS
               CGO_CXXFLAGS
               GOFLAGS
-          - os: linux
-            arch: amd64
-            suffix: '-sycl'
-            build-args: |
-              CGO_CFLAGS
-              CGO_CXXFLAGS
-              GOFLAGS
-              FLAVOR=sycl
     runs-on: ubuntu-latest
     environment: release
     needs: [linux-build]
