@@ -30,7 +30,7 @@ jobs:
             arch: amd64
             target: archive
           - os: linux
-            arch: intel
+            arch: amd64
             target: sycl
     runs-on: ubuntu-latest
     environment: release
@@ -88,7 +88,7 @@ jobs:
               CGO_CXXFLAGS
               GOFLAGS
           - os: linux
-            arch: intel
+            arch: amd64
             suffix: '-sycl'
             build-args: |
               CGO_CFLAGS
