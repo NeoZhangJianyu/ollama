@@ -1,3 +1,12 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NeoZhangJianyu <zhang.jianyu@outlook.com>
+Date:   Fri Apr 4 22:27:22 2025 +0800
+Subject: [PATCH] support sycl
+
+---
+ ggml/src/ggml-sycl/ggml-sycl.cpp | 1 ++++
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
 diff --git a/src/ggml-sycl/ggml-sycl.cpp b/src/ggml-sycl/ggml-sycl.cpp
 index 39d53da..c591e70 100644
 --- a/src/ggml-sycl/ggml-sycl.cpp
