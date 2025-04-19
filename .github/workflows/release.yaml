@@ -11,7 +11,7 @@ env:
 
 jobs:
   setup-environment:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     environment: release
     outputs:
       GOFLAGS: ${{ steps.goflags.outputs.GOFLAGS }}
@@ -29,7 +29,7 @@ jobs:
           - os: linux
             arch: amd64
             target: archive
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     environment: release
     needs: setup-environment
     env:
@@ -76,7 +76,7 @@ jobs:
   # Aggregate all the assets and ship a release
   release:
     needs: [linux-build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     environment: release
     permissions:
       contents: write
