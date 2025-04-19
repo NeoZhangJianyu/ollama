@@ -225,7 +225,6 @@ struct ggml_backend_registry {
         dl_handle_ptr handle { dl_load_library(path) };
         if (!handle) {
             if (!silent) {
-                GGML_LOG_ERROR("Error: %s\n",  dlerror());
                 GGML_LOG_ERROR("%s: failed to load %s\n", __func__, path_to_string(path).c_str());
             }
             return nullptr;
@@ -466,8 +465,9 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
     // enumerate all the files that match [lib]ggml-name-*.[so|dll] in the search paths
      // TODO: search system paths
     namespace fs = std::filesystem;
-    std::string file_prefix = backend_filename_prefix() + name;
+    std::string file_prefix = backend_filename_prefix() + name + "-";
     std::vector<fs::path> search_paths;
+
     if (user_search_path == nullptr) {
         search_paths.push_back(fs::current_path());
         search_paths.push_back(get_executable_path());
@@ -483,7 +483,6 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
             continue;
         }
         fs::directory_iterator dir_it(search_path, fs::directory_options::skip_permission_denied);
-
         for (const auto & entry : dir_it) {
             if (entry.is_regular_file()) {
                 std::string filename = entry.path().filename().string();
@@ -491,7 +490,6 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
                 if (filename.find(file_prefix) == 0 && ext == backend_filename_suffix()) {
                     dl_handle_ptr handle { dl_load_library(entry.path()) };
                     if (!handle) {
-                        GGML_LOG_ERROR("Error: %s\n",  dlerror());
                         GGML_LOG_ERROR("%s: failed to load %s\n", __func__, path_to_string(entry.path()).c_str());
                         continue;
                     }
@@ -512,6 +510,7 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
             }
         }
     }
+
     if (best_score == 0) {
         // try to load the base backend
         for (const auto & search_path : search_paths) {
@@ -522,6 +521,7 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
         }
         return nullptr;
     }
+
     return get_reg().load_backend(best_path, silent);
 }
 
