@@ -15,6 +15,9 @@ TEMP_DIR=$(mktemp -d)
 cleanup() { rm -rf $TEMP_DIR; }
 trap cleanup EXIT
 
+#RELEASE_HOST_URL=https://ollama.com/download
+RELEASE_HOST_URL=https://github.com/NeoZhangJianyu/ollama/releases/download/development
+
 available() { command -v $1 >/dev/null; }
 require() {
     local MISSING=''
@@ -80,7 +83,7 @@ $SUDO install -o0 -g0 -m755 -d $BINDIR
 $SUDO install -o0 -g0 -m755 -d "$OLLAMA_INSTALL_DIR/lib/ollama"
 status "Downloading Linux ${ARCH} bundle"
 curl --fail --show-error --location --progress-bar \
-    "https://ollama.com/download/ollama-linux-${ARCH}.tgz${VER_PARAM}" | \
+    "${RELEASE_HOST_URL}/ollama-linux-${ARCH}.tgz${VER_PARAM}" | \
     $SUDO tar -xzf - -C "$OLLAMA_INSTALL_DIR"
 
 if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ] ; then
@@ -217,8 +220,8 @@ if check_gpu nvidia-smi; then
     exit 0
 fi
 
-if ! check_gpu lspci nvidia && ! check_gpu lshw nvidia && ! check_gpu lspci amdgpu && ! check_gpu lshw amdgpu; && \
-    ! check_gpu lspci intelgpu && ! check_gpu lshw intelgpu
+if ! check_gpu lspci nvidia && ! check_gpu lshw nvidia && ! check_gpu lspci amdgpu && ! check_gpu lshw amdgpu && \
+    ! check_gpu lspci intelgpu && ! check_gpu lshw intelgpu; then
     install_success
     warning "No NVIDIA/AMD/Intel GPU detected. Ollama will run in CPU-only mode."
     exit 0
@@ -238,7 +241,7 @@ fi
 if check_gpu lspci intelgpu || check_gpu lshw intelgpu; then
     status "Downloading Linux SYCL ${ARCH} bundle"
     curl --fail --show-error --location --progress-bar \
-        "https://ollama.com/download/ollama-linux-${ARCH}-sycl.tgz${VER_PARAM}" | \
+        "${RELEASE_HOST_URL}/ollama-linux-${ARCH}-sycl.tgz${VER_PARAM}" | \
         $SUDO tar -xzf - -C "$OLLAMA_INSTALL_DIR"
 
     install_success
