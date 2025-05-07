@@ -465,9 +465,8 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
     // enumerate all the files that match [lib]ggml-name-*.[so|dll] in the search paths
      // TODO: search system paths
     namespace fs = std::filesystem;
-    std::string file_prefix = backend_filename_prefix() + name + "-";
+    std::string file_prefix = backend_filename_prefix() + name;
     std::vector<fs::path> search_paths;
-
     if (user_search_path == nullptr) {
         search_paths.push_back(fs::current_path());
         search_paths.push_back(get_executable_path());
