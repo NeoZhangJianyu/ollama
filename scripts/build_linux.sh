@@ -22,8 +22,6 @@ docker buildx build \
         -f Dockerfile \
         .
 
-echo "show ldd version"
-ldd --version
 # echo "Build 2 for archive {PLATFORM} rocm"
 # if echo $PLATFORM | grep "amd64" > /dev/null; then
 #     outDir="./dist"
