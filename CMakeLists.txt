@@ -93,7 +93,7 @@ if (DEFINED ENV{ONEAPI_ROOT})
         install(TARGETS ggml-sycl
             RUNTIME_DEPENDENCIES
                 DIRECTORIES ${TBBROOT}/lib/ ${DNNLROOT}/lib ${MKLROOT}/lib ${CMPLR_ROOT}/lib
-                PRE_INCLUDE_REGEXES  tbb dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
+                PRE_INCLUDE_REGEXES  ur_adapter_level_zero OpenCL umf tbb dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
                 PRE_EXCLUDE_REGEXES ".*"
                 POST_EXCLUDE_REGEXES
                     [=[.*system32\/.*\.dll]=]
