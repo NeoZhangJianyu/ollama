@@ -45,6 +45,7 @@ Platform #0: Intel(R) OpenCL HD Graphics
 
 ```
 git clone https://github.com/NeoZhangJianyu/ollama
+cd ollama
 ./script/install.sh
 ```
 
