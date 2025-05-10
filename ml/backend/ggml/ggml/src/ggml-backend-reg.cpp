@@ -492,23 +492,17 @@ static ggml_backend_reg_t ggml_backend_load_best(const char * name, bool silent,
                         GGML_LOG_ERROR("%s: failed to load %s\n", __func__, path_to_string(entry.path()).c_str());
                         continue;
                     }
-                    GGML_LOG_ERROR("zjy 1\n");
                     auto score_fn = (ggml_backend_score_t) dl_get_sym(handle.get(), "ggml_backend_score");
                     if (!score_fn) {
                         GGML_LOG_DEBUG("%s: failed to find ggml_backend_score in %s\n", __func__, path_to_string(entry.path()).c_str());
                         continue;
                     }
-                    GGML_LOG_ERROR("zjy 2\n");
                     int s = score_fn();
-		    GGML_LOG_ERROR("zjy 3\n");
                     GGML_LOG_DEBUG("%s: %s score: %d\n", __func__, path_to_string(entry.path()).c_str(), s);
-		    GGML_LOG_ERROR("zjy 4\n");
                     if (s > best_score) {
                         best_score = s;
                         best_path = entry.path();
-			GGML_LOG_ERROR("zjy 5 best=%s\n", path_to_string(best_path).c_str());
                     }
-		    GGML_LOG_ERROR("zjy 6\n");
                 }
             }
         }
