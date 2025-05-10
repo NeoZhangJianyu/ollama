@@ -176,6 +176,7 @@ RestartSec=3
 Environment="PATH=$PATH"
 
 #Environment="https_proxy=http://proxy.xxx.yyy:8080"
+#Environment="OLLAMA_DEBUG=1"
 
 [Install]
 WantedBy=default.target
@@ -189,8 +190,10 @@ EOF
         else
             LD_LIBRARY_PATH="${OLLAMA_INSTALL_DIR}/lib/ollama:${OLLAMA_INSTALL_DIR}/lib/ollama/sycl:$LD_LIBRARY_PATH"
         fi
-        $SUDO sed -i '/\[Install\]/i Environment="LD_LIBRARY_PATH='"${LD_LIBRARY_PATH}"'' /etc/systemd/system/ollama.service
-        $SUDO sed -i '/\[Install\]/i Environment="OLLAMA_INTEL_GPU=1"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i Environment="LD_LIBRARY_PATH='"${LD_LIBRARY_PATH}"'"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i #Environment="OLLAMA_DISABLE_INTEL_GPU=1"' /etc/systemd/system/ollama.service
+
     fi
 
     SYSTEMCTL_RUNNING="$(systemctl is-system-running || true)"
