@@ -24,6 +24,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 [Manual install instructions](https://github.com/ollama/ollama/blob/main/docs/linux.md)
 
+For Intel GPU, please refer to [Intel GPU](docs/intel_gpu.md).
+
 ### Docker
 
 The official [Ollama Docker image](https://hub.docker.com/r/ollama/ollama) `ollama/ollama` is available on Docker Hub.
