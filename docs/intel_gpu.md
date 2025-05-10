@@ -63,6 +63,12 @@ tar: lib/ollama/sycl: time stamp xxxx is xxxx s in the future
 >>> Intel GPU ready.
 ```
 
+### Uninstall Ollama
+
+```
+./scripts/uninstall.sh
+```
+
 ### Check Status
 
 #### Check Ollama Service Status
@@ -135,7 +141,18 @@ ollama[2055516]: llama_init_from_model:  SYCL_Host compute buffer size =    17.1
 
 ```
 
-#### Usage
+#### Check the Used GPU
+
+```
+vi /var/log/syslog
+
+ollama[2866937]: Found 1 SYCL devices:
+...
+ollama[2866937]: | 0| [level_zero:gpu:0]|                Intel Arc A770 Graphics|  12.55|    512|    1024|   32| 16225M|         1.6.32567+18|
+
+```
+
+### Usage
 
 Note: after update the ollama.service file, you must restart the Ollama server to enable it.
 
@@ -173,11 +190,11 @@ sudo vi /etc/systemd/system/ollama.service
 Environment="OLLAMA_DISABLE_INTEL_GPU=1"
 ```
 
-#### Build from Source Code
+### Build from Source Code
+
+- Install Docker
 
 You need to install Docker before it.
-
-- Build local
 
 If you need set proxy to access internet, please add https_proxy in Dockerfile:
 
@@ -187,13 +204,13 @@ vi Dockerfile
 ENV https_proxy http://proxy.xxx.com:8080
 ```
 
-Build Ollama for Intel GPU:
+- Build Ollama for Intel GPU
 
 ```
 ./scripts/build_linux.sh
 ```
 
-Then check the folder "dist"
+- Check output in folder "dist"
 
 ```
 ls dist
@@ -201,18 +218,11 @@ ls dist
 bin  lib  ollama-linux-amd64-sycl.tgz  ollama-linux-amd64.tgz
 ```
 
-- Install to local
+- Install to Local
 
 ```
 ./scripts/local_install.sh
 ```
-
-- Uninstall Ollama
-
-```
-./scripts/uninstall.sh
-```
-
 
 ### Windows
 
@@ -222,7 +232,3 @@ Intel GPU drivers instructions guide and download page can be found here: [Get i
 
 
 Coming soon!
-
-## Usage
-
-##
