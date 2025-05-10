@@ -6,12 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"log/slog"
 )
 
 func TestBasicGetGPUInfo(t *testing.T) {
 	info := GetGPUInfo()
 	assert.NotEmpty(t, len(info))
-	assert.Contains(t, "cuda rocm cpu metal", info[0].Library)
+	assert.Contains(t, "cuda rocm cpu metal sycl", info[0].Library)
 	if info[0].Library != "cpu" {
 		assert.Greater(t, info[0].TotalMemory, uint64(0))
 		assert.Greater(t, info[0].FreeMemory, uint64(0))
@@ -57,4 +58,10 @@ func TestByLibrary(t *testing.T) {
 	}
 }
 
+func TestGetVisibleDevicesEnv(t *testing.T) {
+	gpus := GetGPUInfo()
+	slog.Info("GetGPUInfo", "gpus", len(gpus), "gpus[0].Library", gpus[0].Library)
+	name, val := gpus.GetVisibleDevicesEnv()
+	slog.Info("TestGetVisibleDevicesEnv", "name", name, "val", val)
+}
 // TODO - add some logic to figure out card type through other means and actually verify we got back what we expected

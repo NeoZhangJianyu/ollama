@@ -162,8 +162,8 @@ var (
 	NoPrune = Bool("OLLAMA_NOPRUNE")
 	// SchedSpread allows scheduling models across all GPUs.
 	SchedSpread = Bool("OLLAMA_SCHED_SPREAD")
-	// IntelGPU enables experimental Intel GPU detection.
-	IntelGPU = Bool("OLLAMA_INTEL_GPU")
+	// Disable Intel GPU detection.
+	DisableIntelGPU = Bool("OLLAMA_DISABLE_INTEL_GPU")
 	// MultiUserCache optimizes prompt caching for multi-user scenarios
 	MultiUserCache = Bool("OLLAMA_MULTIUSER_CACHE")
 	// Enable the new Ollama engine
@@ -277,7 +277,8 @@ func AsMap() map[string]EnvVar {
 		ret["ROCR_VISIBLE_DEVICES"] = EnvVar{"ROCR_VISIBLE_DEVICES", RocrVisibleDevices(), "Set which AMD devices are visible by UUID or numeric ID"}
 		ret["GPU_DEVICE_ORDINAL"] = EnvVar{"GPU_DEVICE_ORDINAL", GpuDeviceOrdinal(), "Set which AMD devices are visible by numeric ID"}
 		ret["HSA_OVERRIDE_GFX_VERSION"] = EnvVar{"HSA_OVERRIDE_GFX_VERSION", HsaOverrideGfxVersion(), "Override the gfx used for all detected AMD GPUs"}
-		ret["OLLAMA_INTEL_GPU"] = EnvVar{"OLLAMA_INTEL_GPU", IntelGPU(), "Enable experimental Intel GPU detection"}
+		ret["OLLAMA_DISABLE_INTEL_GPU"] = EnvVar{"OLLAMA_DISABLE_INTEL_GPU", DisableIntelGPU(), "Disable Intel GPU detection"}
+
 	}
 
 	return ret

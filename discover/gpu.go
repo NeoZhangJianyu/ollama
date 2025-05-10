@@ -334,7 +334,7 @@ func GetGPUInfo() GpuInfoList {
 		}
 
 		// Intel
-		if envconfig.IntelGPU() {
+		if !envconfig.DisableIntelGPU() {
 			oHandles = initSyclHandles()
 			if oHandles != nil && oHandles.sycl != nil {
 				for d := range oHandles.sycl.num_drivers {
@@ -459,6 +459,7 @@ func GetGPUInfo() GpuInfoList {
 		}
 
 		if oHandles == nil && len(syclGPUs) > 0 {
+			slog.Debug("zjy syc gpu length", "len", len(syclGPUs))
 			oHandles = initSyclHandles()
 		}
 		for i, gpu := range syclGPUs {

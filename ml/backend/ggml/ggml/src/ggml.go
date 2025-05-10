@@ -35,6 +35,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/ollama/ollama/envconfig"
 	_ "github.com/ollama/ollama/ml/backend/ggml/ggml/src/ggml-cpu"
 )
 
@@ -91,6 +92,10 @@ var OnceLoad = sync.OnceFunc(func() {
 
 		if abspath != filepath.Dir(exe) && !strings.Contains(abspath, filepath.FromSlash("lib/ollama")) {
 			slog.Debug("skipping path which is not part of ollama", "path", abspath)
+			continue
+		}
+
+		if envconfig.DisableIntelGPU() && strings.Contains(abspath, "sycl") {
 			continue
 		}
 
