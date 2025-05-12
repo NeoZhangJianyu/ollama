@@ -153,6 +153,14 @@ ollama[2866937]: | 0| [level_zero:gpu:0]|                Intel Arc A770 Graphics
 
 ```
 
+#### Check How Many Layers Handled by GPU
+
+```
+vi /var/log/syslog
+
+ollama[4720]: load_tensors: offloaded 31/31 layers to GPU
+```
+
 ### Usage
 
 Note: after update the ollama.service file, you must restart the Ollama server to enable it.
