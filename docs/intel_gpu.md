@@ -178,6 +178,14 @@ sudo vi /etc/systemd/system/ollama.service
 Environment="ONEAPI_DEVICE_SELECTOR=level_zero:1"
 
 ```
+Restore Ollama service.
+
+
+Note, it's possible to runn LLM on both iGPU and dGPU.
+
+Set `Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0;level_zero:1"`.
+
+It can't improve the performance, but support bigger LLM.
 
 - Disable Intel GPU in Ollama
 
@@ -190,6 +198,16 @@ sudo vi /etc/systemd/system/ollama.service
 
 Environment="OLLAMA_DISABLE_INTEL_GPU=1"
 ```
+Restore Ollama service.
+
+- Debug
+
+```
+sudo vi /etc/systemd/system/ollama.service
+
+Environment="OLLAMA_DEBUG=1"
+```
+Restore Ollama service.
 
 ### Build from Source Code
 
@@ -233,3 +251,44 @@ Intel GPU drivers instructions guide and download page can be found here: [Get i
 
 
 Coming soon!
+
+
+## Q&A
+
+- I meet the following error:
+
+```
+>>> hi
+Error: POST predict: Post "http://127.0.0.1:38339/completion": EOF
+```
+
+A: It's known issue after restart Ollama service with the changed config file: /etc/systemd/system/ollama.service and .
+
+Please try again! After several times, it will disappear. Maybe the root cause is the load dynamic library issue.
+
+- Can I use multiple GPUs in my machine?
+
+A: Yes. Ollama use ggml SYCL backend to support Intel GPU. It supports multiple GPUs as default.
+
+But it's serial model, instead of parallel model. That means the multiple GPUs can load bigger model, instead of speeding up the inference.
+
+It only supports Intel GPUs, instead of mix vendors.
+
+You could assign the multiple GPUs by:
+
+`Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0;level_zero:1;level_zero:2"`.
+
+Recommend to use the GPUs with same mode. That only reduce 5% performance.
+
+If mix Intel iGPU and dGPU, the whole process will be impacted by the low performance of iGPU.
+
+- How I can confirm multiple GPUs to be used?
+
+A: Check the log `vi /var/log/syslog`'
+
+You will see similar info for 2 GPUs are used:
+
+```
+ollama[2118444]: load_tensors:        SYCL0 model buffer size =    13.33 MiB
+ollama[2118444]: load_tensors:        SYCL1 model buffer size =    72.49 MiB
+```

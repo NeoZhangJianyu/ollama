@@ -46,7 +46,7 @@ var (
 	CudartMgmtName = "cudart64_*.dll"
 	NvcudaMgmtName = "nvcuda.dll"
 	NvmlMgmtName   = "nvml.dll"
-	SyclMgmtName = "ze_intel_gpu64.dll"
+	SyclMgmtName = "libggml-sycl.dll"
 )
 
 func GetCPUMem() (memInfo, error) {

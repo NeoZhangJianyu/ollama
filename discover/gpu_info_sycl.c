@@ -4,13 +4,10 @@
 
 #include <string.h>
 
+#define LOG_BUF_LEN 1024
+
 void sycl_init(char *sycl_lib_path, sycl_init_resp_t *resp) {
-  ze_result_t ret;
   resp->err = NULL;
-  resp->oh.devices = NULL;
-  resp->oh.num_devices = NULL;
-  resp->oh.drivers = NULL;
-  resp->oh.num_drivers = 0;
   const int buflen = 256;
   char buf[buflen + 1];
   int i, d;
@@ -18,14 +15,9 @@ void sycl_init(char *sycl_lib_path, sycl_init_resp_t *resp) {
     char *s;
     void **p;
   } l[] = {
-      {"zesInit", (void *)&resp->oh.zesInit},
-      {"zesDriverGet", (void *)&resp->oh.zesDriverGet},
-      {"zesDeviceGet", (void *)&resp->oh.zesDeviceGet},
-      {"zesDeviceGetProperties", (void *)&resp->oh.zesDeviceGetProperties},
-      {"zesDeviceEnumMemoryModules",
-       (void *)&resp->oh.zesDeviceEnumMemoryModules},
-      {"zesMemoryGetProperties", (void *)&resp->oh.zesMemoryGetProperties},
-      {"zesMemoryGetState", (void *)&resp->oh.zesMemoryGetState},
+      {"ggml_backend_sycl_get_device_memory", (void *)&resp->oh.ggml_backend_sycl_get_device_memory},
+      {"ggml_backend_sycl_get_device_count", (void *)&resp->oh.ggml_backend_sycl_get_device_count},
+      {"ggml_backend_sycl_get_device_description", (void *)&resp->oh.ggml_backend_sycl_get_device_description},
       {NULL, NULL},
   };
 
@@ -42,7 +34,7 @@ void sycl_init(char *sycl_lib_path, sycl_init_resp_t *resp) {
 
   // TODO once we've squashed the remaining corner cases remove this log
   LOG(resp->oh.verbose,
-      "wiring Level-Zero management library functions in %s\n",
+      "wiring ggml sycl library functions in %s\n",
       sycl_lib_path);
 
   for (i = 0; l[i].s != NULL; i++) {
@@ -61,200 +53,81 @@ void sycl_init(char *sycl_lib_path, sycl_init_resp_t *resp) {
       return;
     }
   }
-
-  LOG(resp->oh.verbose, "calling zesInit\n");
-
-  ret = (*resp->oh.zesInit)(0);
-  if (ret != ZE_RESULT_SUCCESS) {
-    LOG(resp->oh.verbose, "zesInit err: %x\n", ret);
-    snprintf(buf, buflen, "sycl vram init failure: %x", ret);
-    resp->err = strdup(buf);
-    sycl_release(resp->oh);
-    return;
-  }
-
-  LOG(resp->oh.verbose, "calling zesDriverGet\n");
-  ret = (*resp->oh.zesDriverGet)(&resp->oh.num_drivers, NULL);
-  if (ret != ZE_RESULT_SUCCESS) {
-    LOG(resp->oh.verbose, "zesDriverGet err: %x\n", ret);
-    snprintf(buf, buflen, "unable to get driver count: %x", ret);
-    resp->err = strdup(buf);
-    sycl_release(resp->oh);
-    return;
-  }
-  LOG(resp->oh.verbose, "sycl driver count: %d\n", resp->oh.num_drivers);
-  resp->oh.drivers = malloc(resp->oh.num_drivers * sizeof(zes_driver_handle_t));
-  resp->oh.num_devices = malloc(resp->oh.num_drivers * sizeof(uint32_t));
-  memset(&resp->oh.num_devices[0], 0, resp->oh.num_drivers * sizeof(uint32_t));
-  resp->oh.devices =
-      malloc(resp->oh.num_drivers * sizeof(zes_device_handle_t *));
-  ret = (*resp->oh.zesDriverGet)(&resp->oh.num_drivers, &resp->oh.drivers[0]);
-  if (ret != ZE_RESULT_SUCCESS) {
-    LOG(resp->oh.verbose, "zesDriverGet err: %x\n", ret);
-    snprintf(buf, buflen, "unable to get driver count: %x", ret);
-    resp->err = strdup(buf);
-    sycl_release(resp->oh);
-    return;
-  }
-
-  for (d = 0; d < resp->oh.num_drivers; d++) {
-    LOG(resp->oh.verbose, "calling zesDeviceGet index %d: %p\n", d, resp->oh.drivers[d]);
-    ret = (*resp->oh.zesDeviceGet)(resp->oh.drivers[d],
-                                   &resp->oh.num_devices[d], NULL);
-    if (ret != ZE_RESULT_SUCCESS) {
-      LOG(resp->oh.verbose, "zesDeviceGet err: %x\n", ret);
-      snprintf(buf, buflen, "unable to get device count: %x", ret);
-      resp->err = strdup(buf);
-      sycl_release(resp->oh);
-      return;
-    }
-    resp->oh.devices[d] =
-        malloc(resp->oh.num_devices[d] * sizeof(zes_device_handle_t));
-    ret = (*resp->oh.zesDeviceGet)(
-        resp->oh.drivers[d], &resp->oh.num_devices[d], resp->oh.devices[d]);
-    if (ret != ZE_RESULT_SUCCESS) {
-      LOG(resp->oh.verbose, "zesDeviceGet err: %x\n", ret);
-      snprintf(buf, buflen, "unable to get device count: %x", ret);
-      resp->err = strdup(buf);
-      sycl_release(resp->oh);
-      return;
-    }
-  }
-
   return;
 }
 
-void sycl_check_vram(sycl_handle_t h, int driver, int device,
-                       mem_info_t *resp) {
-  ze_result_t ret;
-  resp->err = NULL;
+void format_str(char* buf, int buf_len, uint64_t num) {
+    if (num<1000000) {
+        snprintf(buf, buf_len, "[%0.2f KB]", num/1000.0);
+        return;
+    } else if (num<1000000000) {
+        snprintf(buf, buf_len, "[%0.2f MB]", num/1000000.0);
+        return;
+    } else {
+        snprintf(buf, buf_len, "[%0.2f GB]", num/1000000000.0);
+        return;
+    }
+
+}
+void sycl_get_device_info(sycl_init_resp_t *resp, int device,
+                       mem_info_t *res_mem_info) {
+  res_mem_info->err = NULL;
   uint64_t totalMem = 0;
   uint64_t usedMem = 0;
   const int buflen = 256;
   char buf[buflen + 1];
   int i, d, m;
 
+  sycl_handle_t h = resp->oh;
+
   if (h.handle == NULL) {
-    resp->err = strdup("Level-Zero handle not initialized");
+    res_mem_info->err = strdup("ggml sycl handle not initialized");
     return;
   }
 
-  if (driver > h.num_drivers || device > h.num_devices[driver]) {
-    resp->err = strdup("driver of device index out of bounds");
+  if (device < 0  || device >= 24) {
+    res_mem_info->err = strdup("driver of device index out of bounds [0-23]");
     return;
   }
 
-  resp->total = 0;
-  resp->free = 0;
+  res_mem_info->total = 0;
+  res_mem_info->free = 0;
 
-  zes_device_ext_properties_t ext_props;
-  ext_props.stype = ZES_STRUCTURE_TYPE_DEVICE_EXT_PROPERTIES;
-  ext_props.pNext = NULL;
+  resp->oh.ggml_backend_sycl_get_device_description(device, &res_mem_info->gpu_name[0], GPU_NAME_LEN);
 
-  zes_device_properties_t props;
-  props.stype = ZES_STRUCTURE_TYPE_DEVICE_PROPERTIES;
-  props.pNext = &ext_props;
 
-  ret = (*h.zesDeviceGetProperties)(h.devices[driver][device], &props);
-  if (ret != ZE_RESULT_SUCCESS) {
-    snprintf(buf, buflen, "unable to get device properties: %d", ret);
-    resp->err = strdup(buf);
-    return;
-  }
+  snprintf(&res_mem_info->gpu_id[0], GPU_ID_LEN, "%d", device);
 
-  snprintf(&resp->gpu_name[0], GPU_NAME_LEN, "%s", props.modelName);
+  size_t free_mem = 0;
+  size_t total_mem = 0;
+  resp->oh.ggml_backend_sycl_get_device_memory(device, &free_mem, &total_mem);
+  res_mem_info->total = total_mem;
+  res_mem_info->free = free_mem;
 
-  // TODO this needs to map to ONEAPI_DEVICE_SELECTOR syntax
-  // (this is probably wrong...)
-  // TODO - the driver isn't included - what if there are multiple drivers?
-  snprintf(&resp->gpu_id[0], GPU_ID_LEN, "%d", device);
+  char str_total[LOG_BUF_LEN];
+  char str_free[LOG_BUF_LEN];
 
-  if (h.verbose) {
-    // When in verbose mode, report more information about
-    // the card we discover.
-    LOG(h.verbose, "[driver-%d: device-%d]\n", driver, device);
-    LOG(h.verbose, "[%d:%d] sycl device name: %s\n", driver, device,
-        props.modelName);
-    LOG(h.verbose, "[%d:%d] sycl brand: %s\n", driver, device,
-        props.brandName);
-    LOG(h.verbose, "[%d:%d] sycl vendor: %s\n", driver, device,
-        props.vendorName);
-    LOG(h.verbose, "[%d:%d] sycl S/N: %s\n", driver, device,
-        props.serialNumber);
-    LOG(h.verbose, "[%d:%d] sycl board number: %s\n", driver, device,
-        props.boardNumber);
-  }
+  format_str(str_total, LOG_BUF_LEN-1, total_mem);
+  format_str(str_free, LOG_BUF_LEN-1, free_mem);
 
-  // TODO
-  // Compute Capability equivalent in resp->major, resp->minor, resp->patch
-
-  uint32_t memCount = 0;
-  ret = (*h.zesDeviceEnumMemoryModules)(h.devices[driver][device], &memCount,
-                                        NULL);
-  if (ret != ZE_RESULT_SUCCESS) {
-    snprintf(buf, buflen, "unable to enumerate Level-Zero memory modules: %x",
-             ret);
-    resp->err = strdup(buf);
-    return;
-  }
-
-  LOG(h.verbose, "[%d:%d] discovered %d Level-Zero memory modules\n", driver, device, memCount);
-
-  zes_mem_handle_t *mems = malloc(memCount * sizeof(zes_mem_handle_t));
-  (*h.zesDeviceEnumMemoryModules)(h.devices[driver][device], &memCount, mems);
-
-  for (m = 0; m < memCount; m++) {
-    zes_mem_state_t state;
-    state.stype = ZES_STRUCTURE_TYPE_MEM_STATE;
-    state.pNext = NULL;
-    ret = (*h.zesMemoryGetState)(mems[m], &state);
-    if (ret != ZE_RESULT_SUCCESS) {
-      snprintf(buf, buflen, "unable to get memory state: %x", ret);
-      resp->err = strdup(buf);
-      free(mems);
-      return;
-    }
-
-    resp->total += state.size;
-    resp->free += state.free;
-  }
-
-  free(mems);
+  LOG(h.verbose, "Detect GPU [%d]-[%s] Mem: Free %s Total %s\n",
+    device, res_mem_info->gpu_name, str_free, str_total);
 }
 
-void sycl_release(sycl_handle_t h) {
+void sycl_release(sycl_init_resp_t *resp) {
   int d;
+  sycl_handle_t h = resp->oh;
   LOG(h.verbose, "releasing sycl library\n");
-  for (d = 0; d < h.num_drivers; d++) {
-    if (h.devices != NULL && h.devices[d] != NULL) {
-      free(h.devices[d]);
-    }
-  }
-  if (h.devices != NULL) {
-    free(h.devices);
-    h.devices = NULL;
-  }
-  if (h.num_devices != NULL) {
-    free(h.num_devices);
-    h.num_devices = NULL;
-  }
-  if (h.drivers != NULL) {
-    free(h.drivers);
-    h.drivers = NULL;
-  }
-  h.num_drivers = 0;
   UNLOAD_LIBRARY(h.handle);
   h.handle = NULL;
 }
 
-int sycl_get_device_count(sycl_handle_t h, int driver) {
-  if (h.handle == NULL || h.num_devices == NULL) {
+int sycl_get_device_count(sycl_init_resp_t *resp) {
+  if (resp->oh.handle == NULL) {
     return 0;
   }
-  if (driver > h.num_drivers) {
-    return 0;
-  }
-  return (int)h.num_devices[driver];
+
+  return resp->oh.ggml_backend_sycl_get_device_count();
 }
 
 #endif // __APPLE__

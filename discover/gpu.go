@@ -33,7 +33,7 @@ type cudaHandles struct {
 }
 
 type syclHandles struct {
-	sycl      *C.sycl_handle_t
+	resp        *C.sycl_init_resp_t
 	deviceCount int
 }
 
@@ -157,15 +157,16 @@ func initSyclHandles() *syclHandles {
 
 	// Short Circuit if we already know which library to use
 	// ignore bootstrap errors in this case since we already recorded them
+
 	if syclLibPath != "" {
-		oHandles.deviceCount, oHandles.sycl, _, _ = loadSyclMgmt([]string{syclLibPath})
+		oHandles.deviceCount, oHandles.resp, _, _ = loadSyclMgmt([]string{syclLibPath})
 		return oHandles
 	}
 
 	syclLibPaths := FindGPULibs(SyclMgmtName, SyclGlobs)
 	if len(syclLibPaths) > 0 {
 		var err error
-		oHandles.deviceCount, oHandles.sycl, syclLibPath, err = loadSyclMgmt(syclLibPaths)
+		oHandles.deviceCount, oHandles.resp, syclLibPath, err = loadSyclMgmt(syclLibPaths)
 		if err != nil {
 			bootstrapErrors = append(bootstrapErrors, err)
 		}
@@ -206,9 +207,9 @@ func GetGPUInfo() GpuInfoList {
 			}
 		}
 		if oHandles != nil {
-			if oHandles.sycl != nil {
+			if oHandles.resp != nil {
 				// TODO - is this needed?
-				C.sycl_release(*oHandles.sycl)
+				C.sycl_release(oHandles.resp)
 			}
 		}
 	}()
@@ -336,36 +337,31 @@ func GetGPUInfo() GpuInfoList {
 		// Intel
 		if !envconfig.DisableIntelGPU() {
 			oHandles = initSyclHandles()
-			if oHandles != nil && oHandles.sycl != nil {
-				for d := range oHandles.sycl.num_drivers {
-					if oHandles.sycl == nil {
-						// shouldn't happen
-						slog.Warn("nil sycl handle with driver count", "count", int(oHandles.sycl.num_drivers))
-						continue
+			if oHandles != nil && oHandles.resp != nil {
+				devCount := C.sycl_get_device_count(oHandles.resp)
+				slog.Debug("find sycl device", "devCount", devCount)
+				for i := range devCount {
+					gpuInfo := SyclGPUInfo{
+						GpuInfo: GpuInfo{
+							Library: "sycl",
+						},
+						driverIndex: int(0),
+						gpuIndex:    int(i),
 					}
-					devCount := C.sycl_get_device_count(*oHandles.sycl, C.int(d))
-					slog.Debug("find sycl device", "devCount", devCount)
-					for i := range devCount {
-						gpuInfo := SyclGPUInfo{
-							GpuInfo: GpuInfo{
-								Library: "sycl",
-							},
-							driverIndex: int(d),
-							gpuIndex:    int(i),
-						}
-						// TODO - split bootstrapping from updating free memory
-						C.sycl_check_vram(*oHandles.sycl, C.int(d), i, &memInfo)
-						// TODO - convert this to MinimumMemory based on testing...
-						var totalFreeMem float64 = float64(memInfo.free) * 0.95 // work-around: leave some reserve vram for mkl lib used in ggml-sycl backend.
-						memInfo.free = C.uint64_t(totalFreeMem)
-						gpuInfo.TotalMemory = uint64(memInfo.total)
-						gpuInfo.FreeMemory = uint64(memInfo.free)
-						gpuInfo.ID = C.GoString(&memInfo.gpu_id[0])
-						gpuInfo.Name = C.GoString(&memInfo.gpu_name[0])
-						gpuInfo.DependencyPath = []string{LibOllamaPath}
-						syclGPUs = append(syclGPUs, gpuInfo)
-					}
+					// TODO - split bootstrapping from updating free memory
+					C.sycl_get_device_info(oHandles.resp, i, &memInfo)
+					// TODO - convert this to MinimumMemory based on testing...
+					var totalFreeMem float64 = float64(memInfo.free) * 0.95 // work-around: leave some reserve vram for mkl lib used in ggml-sycl backend.
+					memInfo.free = C.uint64_t(totalFreeMem)
+					gpuInfo.TotalMemory = uint64(memInfo.total)
+					gpuInfo.FreeMemory = uint64(memInfo.free)
+					gpuInfo.ID = C.GoString(&memInfo.gpu_id[0])
+					gpuInfo.Name = C.GoString(&memInfo.gpu_name[0])
+					gpuInfo.DependencyPath = []string{LibOllamaPath}
+					syclGPUs = append(syclGPUs, gpuInfo)
 				}
+			} else {
+				slog.Error("Can't load ggm sycl to detect sycl device")
 			}
 		}
 
@@ -459,16 +455,15 @@ func GetGPUInfo() GpuInfoList {
 		}
 
 		if oHandles == nil && len(syclGPUs) > 0 {
-			slog.Debug("zjy syc gpu length", "len", len(syclGPUs))
 			oHandles = initSyclHandles()
 		}
 		for i, gpu := range syclGPUs {
-			if oHandles.sycl == nil {
+			if oHandles.resp == nil {
 				// shouldn't happen
 				slog.Warn("nil sycl handle with device count", "count", oHandles.deviceCount)
 				continue
 			}
-			C.sycl_check_vram(*oHandles.sycl, C.int(gpu.driverIndex), C.int(gpu.gpuIndex), &memInfo)
+			C.sycl_get_device_info(oHandles.resp, C.int(gpu.gpuIndex), &memInfo)
 			// TODO - convert this to MinimumMemory based on testing...
 			var totalFreeMem float64 = float64(memInfo.free) * 0.95 // work-around: leave some reserve vram for mkl lib used in ggml-sycl backend.
 			memInfo.free = C.uint64_t(totalFreeMem)
@@ -646,8 +641,8 @@ func loadNVMLMgmt(nvmlLibPaths []string) (*C.nvml_handle_t, string, error) {
 }
 
 // bootstrap the Intel GPU library
-// Returns: num devices, handle, libPath, error
-func loadSyclMgmt(syclLibPaths []string) (int, *C.sycl_handle_t, string, error) {
+// Returns: num devices, sycl_init_resp_t, libPath, error
+func loadSyclMgmt(syclLibPaths []string) (int, *C.sycl_init_resp_t, string, error) {
 	var resp C.sycl_init_resp_t
 	num_devices := 0
 	resp.oh.verbose = getVerboseState()
@@ -657,15 +652,13 @@ func loadSyclMgmt(syclLibPaths []string) (int, *C.sycl_handle_t, string, error) 
 		defer C.free(unsafe.Pointer(lib))
 		C.sycl_init(lib, &resp)
 		if resp.err != nil {
-			err = fmt.Errorf("Unable to load oneAPI management library %s: %s", libPath, C.GoString(resp.err))
+			err = fmt.Errorf("Unable to load ggml sycl library %s: %s", libPath, C.GoString(resp.err))
 			slog.Debug(err.Error())
 			C.free(unsafe.Pointer(resp.err))
 		} else {
 			err = nil
-			for i := range resp.oh.num_drivers {
-				num_devices += int(C.sycl_get_device_count(resp.oh, C.int(i)))
-			}
-			return num_devices, &resp.oh, libPath, err
+			num_devices = int(C.sycl_get_device_count(&resp))
+			return num_devices, &resp, libPath, err
 		}
 	}
 	return 0, nil, "", err

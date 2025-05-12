@@ -192,6 +192,7 @@ EOF
         fi
         $SUDO sed -i '/\[Install\]/i Environment="LD_LIBRARY_PATH='"${LD_LIBRARY_PATH}"'"' /etc/systemd/system/ollama.service
         $SUDO sed -i '/\[Install\]/i Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i Environment="ZES_ENABLE_SYSMAN=1"' /etc/systemd/system/ollama.service
         $SUDO sed -i '/\[Install\]/i #Environment="OLLAMA_DISABLE_INTEL_GPU=1"' /etc/systemd/system/ollama.service
 
     fi
