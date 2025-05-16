@@ -18,6 +18,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 
 	"github.com/ollama/ollama/api"
@@ -40,6 +42,7 @@ import (
 	"github.com/ollama/ollama/runner"
 	"github.com/ollama/ollama/server"
 	"github.com/ollama/ollama/types/model"
+	"github.com/ollama/ollama/types/syncmap"
 	"github.com/ollama/ollama/version"
 )
 
@@ -105,7 +108,7 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 	}
 	spinner.Stop()
 
-	req.Name = args[0]
+	req.Model = args[0]
 	quantize, _ := cmd.Flags().GetString("quantize")
 	if quantize != "" {
 		req.Quantize = quantize
@@ -116,34 +119,54 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(req.Files) > 0 {
-		fileMap := map[string]string{}
-		for f, digest := range req.Files {
+	var g errgroup.Group
+	g.SetLimit(max(runtime.GOMAXPROCS(0)-1, 1))
+
+	files := syncmap.NewSyncMap[string, string]()
+	for f, digest := range req.Files {
+		g.Go(func() error {
 			if _, err := createBlob(cmd, client, f, digest, p); err != nil {
 				return err
 			}
-			fileMap[filepath.Base(f)] = digest
-		}
-		req.Files = fileMap
+
+			// TODO: this is incorrect since the file might be in a subdirectory
+			//       instead this should take the path relative to the model directory
+			//       but the current implementation does not allow this
+			files.Store(filepath.Base(f), digest)
+			return nil
+		})
 	}
 
-	if len(req.Adapters) > 0 {
-		fileMap := map[string]string{}
-		for f, digest := range req.Adapters {
+	adapters := syncmap.NewSyncMap[string, string]()
+	for f, digest := range req.Adapters {
+		g.Go(func() error {
 			if _, err := createBlob(cmd, client, f, digest, p); err != nil {
 				return err
 			}
-			fileMap[filepath.Base(f)] = digest
-		}
-		req.Adapters = fileMap
+
+			// TODO: same here
+			adapters.Store(filepath.Base(f), digest)
+			return nil
+		})
 	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	req.Files = files.Items()
+	req.Adapters = adapters.Items()
 
 	bars := make(map[string]*progress.Bar)
 	fn := func(resp api.ProgressResponse) error {
 		if resp.Digest != "" {
 			bar, ok := bars[resp.Digest]
 			if !ok {
-				bar = progress.NewBar(fmt.Sprintf("pulling %s...", resp.Digest[7:19]), resp.Total, resp.Completed)
+				msg := resp.Status
+				if msg == "" {
+					msg = fmt.Sprintf("pulling %s...", resp.Digest[7:19])
+				}
+				bar = progress.NewBar(msg, resp.Total, resp.Completed)
 				bars[resp.Digest] = bar
 				p.Add(resp.Digest, bar)
 			}
@@ -212,7 +235,7 @@ func createBlob(cmd *cobra.Command, client *api.Client, path string, digest stri
 		}
 	}()
 
-	if err = client.CreateBlob(cmd.Context(), digest, io.TeeReader(bin, &pw)); err != nil {
+	if err := client.CreateBlob(cmd.Context(), digest, io.TeeReader(bin, &pw)); err != nil {
 		return "", err
 	}
 	return digest, nil
@@ -267,7 +290,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 	opts := runOptions{
 		Model:    args[0],
 		WordWrap: os.Getenv("TERM") == "xterm-256color",
-		Options:  map[string]interface{}{},
+		Options:  map[string]any{},
 	}
 
 	format, err := cmd.Flags().GetString("format")
@@ -339,6 +362,11 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	opts.MultiModal = slices.Contains(info.Capabilities, model.CapabilityVision)
+
+	// TODO: remove the projector info and vision info checks below,
+	// these are left in for backwards compatibility with older servers
+	// that don't have the capabilities field in the model info
 	if len(info.ProjectorInfo) != 0 {
 		opts.MultiModal = true
 	}
@@ -669,6 +697,15 @@ func showInfo(resp *api.ShowResponse, verbose bool, w io.Writer) error {
 		return
 	})
 
+	if len(resp.Capabilities) > 0 {
+		tableRender("Capabilities", func() (rows [][]string) {
+			for _, capability := range resp.Capabilities {
+				rows = append(rows, []string{"", capability.String()})
+			}
+			return
+		})
+	}
+
 	if resp.ProjectorInfo != nil {
 		tableRender("Projector", func() (rows [][]string) {
 			arch := resp.ProjectorInfo["general.architecture"].(string)
@@ -793,13 +830,38 @@ func PullHandler(cmd *cobra.Command, args []string) error {
 
 	fn := func(resp api.ProgressResponse) error {
 		if resp.Digest != "" {
+			if resp.Completed == 0 {
+				// This is the initial status update for the
+				// layer, which the server sends before
+				// beginning the download, for clients to
+				// compute total size and prepare for
+				// downloads, if needed.
+				//
+				// Skipping this here to avoid showing a 0%
+				// progress bar, which *should* clue the user
+				// into the fact that many things are being
+				// downloaded and that the current active
+				// download is not that last. However, in rare
+				// cases it seems to be triggering to some, and
+				// it isn't worth explaining, so just ignore
+				// and regress to the old UI that keeps giving
+				// you the "But wait, there is more!" after
+				// each "100% done" bar, which is "better."
+				return nil
+			}
+
 			if spinner != nil {
 				spinner.Stop()
 			}
 
 			bar, ok := bars[resp.Digest]
 			if !ok {
-				bar = progress.NewBar(fmt.Sprintf("pulling %s...", resp.Digest[7:19]), resp.Total, resp.Completed)
+				name, isDigest := strings.CutPrefix(resp.Digest, "sha256:")
+				name = strings.TrimSpace(name)
+				if isDigest {
+					name = name[:min(12, len(name))]
+				}
+				bar = progress.NewBar(fmt.Sprintf("pulling %s:", name), resp.Total, resp.Completed)
 				bars[resp.Digest] = bar
 				p.Add(resp.Digest, bar)
 			}
@@ -819,11 +881,7 @@ func PullHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	request := api.PullRequest{Name: args[0], Insecure: insecure}
-	if err := client.Pull(cmd.Context(), &request, fn); err != nil {
-		return err
-	}
-
-	return nil
+	return client.Pull(cmd.Context(), &request, fn)
 }
 
 type generateContextKey string
@@ -837,7 +895,7 @@ type runOptions struct {
 	Format      string
 	System      string
 	Images      []api.ImageData
-	Options     map[string]interface{}
+	Options     map[string]any
 	MultiModal  bool
 	KeepAlive   *api.Duration
 }
@@ -1366,7 +1424,6 @@ func NewCLI() *cobra.Command {
 				envVars["OLLAMA_NOPRUNE"],
 				envVars["OLLAMA_ORIGINS"],
 				envVars["OLLAMA_SCHED_SPREAD"],
-				envVars["OLLAMA_TMPDIR"],
 				envVars["OLLAMA_FLASH_ATTENTION"],
 				envVars["OLLAMA_KV_CACHE_TYPE"],
 				envVars["OLLAMA_LLM_LIBRARY"],

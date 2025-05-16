@@ -2,7 +2,6 @@
 
 ARG FLAVOR=${TARGETARCH}
 
-
 ARG ROCMVERSION=6.3.3
 ARG JETPACK5VERSION=r35.4.1
 ARG JETPACK6VERSION=r36.4.0
@@ -16,7 +15,8 @@ ARG INTEL_DL_ESS=2025.1.1-0-devel-ubuntu22.04
 FROM intel/deep-learning-essentials:$INTEL_DL_ESS AS base
 ARG TARGETARCH
 RUN echo "TARGETARCH ${TARGETARCH}"
-
+ENV http_proxy http://192.168.0.102:1080
+ENV https_proxy http://192.168.0.102:1080
 
 ARG GGML_SYCL_F16=OFF
 ARG CMAKEVERSION
@@ -65,6 +65,9 @@ RUN --mount=type=cache,target=/root/.ccache \
 
 
 FROM base AS build
+ENV http_proxy http://192.168.0.102:1080
+ENV https_proxy http://192.168.0.102:1080
+
 WORKDIR /go/src/github.com/ollama/ollama
 COPY go.mod go.sum .
 RUN curl -fsSL https://golang.org/dl/go$(awk '/^go/ { print $2 }' go.mod).linux-$(case $(uname -m) in x86_64) echo amd64 ;; aarch64) echo arm64 ;; esac).tar.gz | tar xz -C /usr/local

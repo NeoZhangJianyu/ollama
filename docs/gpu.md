@@ -112,7 +112,7 @@ and force CPU usage, use an invalid GPU ID (e.g., "-1").  When available, use th
 ### Container Permission
 
 In some Linux distributions, SELinux can prevent containers from
-accessing the AMD GPU devices.  On the host system you can run
+accessing the AMD GPU devices.  On the host system you can run 
 `sudo setsebool container_use_devices=1` to allow containers to use devices.
 
 ### Metal (Apple GPUs)

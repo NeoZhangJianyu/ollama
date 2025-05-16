@@ -24,6 +24,7 @@ set(GGML_LLAMAFILE ON)
 set(GGML_CUDA_PEER_MAX_BATCH_SIZE 128)
 set(GGML_CUDA_GRAPHS ON)
 set(GGML_CUDA_FA ON)
+set(GGML_CUDA_COMPRESSION_MODE default)
 
 if((CMAKE_OSX_ARCHITECTURES AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
     OR (NOT CMAKE_OSX_ARCHITECTURES AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64|ARM64|ARMv[0-9]+"))
@@ -94,7 +95,7 @@ if (DEFINED ENV{ONEAPI_ROOT})
         install(TARGETS ggml-sycl
             RUNTIME_DEPENDENCIES
                 DIRECTORIES ${TBBROOT}/lib/ ${DNNLROOT}/lib ${MKLROOT}/lib ${CMPLR_ROOT}/lib  ${UMF_ROOT}/lib
-                PRE_INCLUDE_REGEXES  dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
+                PRE_INCLUDE_REGEXES  hwloc dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
                 PRE_EXCLUDE_REGEXES ".*"
                 POST_EXCLUDE_REGEXES
                     [=[.*system32\/.*\.dll]=]
@@ -124,6 +125,12 @@ if (DEFINED ENV{ONEAPI_ROOT})
           DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
           FOLLOW_SYMLINK_CHAIN
         )
+        file(COPY
+          ${UMF_ROOT}/lib/libdisjoint_pool.a
+          DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+          FOLLOW_SYMLINK_CHAIN
+        )
+
 
     else()
         message(FATAL_ERROR, "C++ compiler lacks SYCL support.")

@@ -27,12 +27,14 @@
 
 #endif
 
+#ifndef LOG
 #define LOG(verbose, ...) \
   do { \
     if (verbose) { \
       fprintf(stderr, __VA_ARGS__); \
     } \
   } while (0)
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,7 +52,7 @@ typedef struct mem_info {
   uint64_t used;
 
   // Compute Capability
-  int major;
+  int major; 
   int minor;
   int patch;
 } mem_info_t;
