@@ -270,7 +270,7 @@ Coming soon!
 Error: POST predict: Post "http://127.0.0.1:38339/completion": EOF
 ```
 
-A: It's known issue after restart Ollama service with the changed config file: /etc/systemd/system/ollama.service and .
+A: It's known issue after restart Ollama service with the changed config file: /etc/systemd/system/ollama.service.
 
 Please try again! After several times, it will disappear. Maybe the root cause is the load dynamic library issue.
 
@@ -284,11 +284,13 @@ It only supports Intel GPUs, instead of mix vendors.
 
 You could assign the multiple GPUs by:
 
-`Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0;level_zero:1;level_zero:2"`.
+`Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0;level_zero:1"`.
 
 Recommend to use the GPUs with same mode. That only reduce 5% performance.
 
 If mix Intel iGPU and dGPU, the whole process will be impacted by the low performance of iGPU.
+
+Please use SYCL compiler tool `sycl-ls` to check the GPU list. Need to install oneAPI base toolkit for it.
 
 - How I can confirm multiple GPUs to be used?
 
