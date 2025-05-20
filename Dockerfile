@@ -15,8 +15,6 @@ ARG INTEL_DL_ESS=2025.1.1-0-devel-ubuntu22.04
 FROM intel/deep-learning-essentials:$INTEL_DL_ESS AS base
 ARG TARGETARCH
 RUN echo "TARGETARCH ${TARGETARCH}"
-ENV http_proxy http://192.168.0.102:1080
-ENV https_proxy http://192.168.0.102:1080
 
 ARG GGML_SYCL_F16=OFF
 ARG CMAKEVERSION
@@ -65,8 +63,6 @@ RUN --mount=type=cache,target=/root/.ccache \
 
 
 FROM base AS build
-ENV http_proxy http://192.168.0.102:1080
-ENV https_proxy http://192.168.0.102:1080
 
 WORKDIR /go/src/github.com/ollama/ollama
 COPY go.mod go.sum .
