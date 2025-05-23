@@ -50,7 +50,7 @@ var (
 	CudartMgmtName = "libcudart.so*"
 	NvcudaMgmtName = "libcuda.so*"
 	NvmlMgmtName   = "" // not currently wired on linux
-	SyclMgmtName = "libggml-sycl.so*"
+	SyclMgmtName   = "libggml-sycl.so*"
 )
 
 func GetCPUMem() (memInfo, error) {

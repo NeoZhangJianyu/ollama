@@ -64,4 +64,5 @@ func TestGetVisibleDevicesEnv(t *testing.T) {
 	name, val := gpus.GetVisibleDevicesEnv()
 	slog.Info("TestGetVisibleDevicesEnv", "name", name, "val", val)
 }
+
 // TODO - add some logic to figure out card type through other means and actually verify we got back what we expected

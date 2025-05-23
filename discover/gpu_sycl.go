@@ -4,12 +4,11 @@ package discover
 
 import (
 	"log/slog"
-	"strings"
 	"os"
+	"strings"
 )
 
 func syclGetVisibleDevicesEnv(gpuInfo []GpuInfo) (string, string) {
-
 	host_selector := os.Getenv("ONEAPI_DEVICE_SELECTOR")
 	if host_selector != "" {
 		slog.Info("syclGetVisibleDevicesEnv", "Detect host ONEAPI_DEVICE_SELECTOR, return it directly", host_selector)
