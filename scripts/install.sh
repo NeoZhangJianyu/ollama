@@ -15,8 +15,20 @@ TEMP_DIR=$(mktemp -d)
 cleanup() { rm -rf $TEMP_DIR; }
 trap cleanup EXIT
 
+default_rel_tag=v0.0.1
+
+if [ $# -gt 0 ]; then
+    rel_tag=$1
+else
+    rel_tag=${default_rel_tag}
+fi
+
 #RELEASE_HOST_URL=https://ollama.com/download
-RELEASE_HOST_URL=https://github.com/NeoZhangJianyu/ollama/releases/download/development
+RELEASE_HOST_URL=https://github.com/NeoZhangJianyu/ollama/releases/download/${rel_tag}
+
+echo "Usage: $0 [tag]. Default tag: ${default_rel_tag}\n"
+
+echo "Downloading ${rel_tag} release"
 
 available() { command -v $1 >/dev/null; }
 require() {
