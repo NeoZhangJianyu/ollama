@@ -15,6 +15,9 @@ TEMP_DIR=$(mktemp -d)
 cleanup() { rm -rf $TEMP_DIR; }
 trap cleanup EXIT
 
+#RELEASE_HOST_URL=https://ollama.com/download
+RELEASE_HOST_URL=https://github.com/NeoZhangJianyu/ollama/releases/download/development
+
 available() { command -v $1 >/dev/null; }
 require() {
     local MISSING=''
@@ -80,7 +83,7 @@ $SUDO install -o0 -g0 -m755 -d $BINDIR
 $SUDO install -o0 -g0 -m755 -d "$OLLAMA_INSTALL_DIR/lib/ollama"
 status "Downloading Linux ${ARCH} bundle"
 curl --fail --show-error --location --progress-bar \
-    "https://ollama.com/download/ollama-linux-${ARCH}.tgz${VER_PARAM}" | \
+    "${RELEASE_HOST_URL}/ollama-linux-${ARCH}.tgz${VER_PARAM}" | \
     $SUDO tar -xzf - -C "$OLLAMA_INSTALL_DIR"
 
 if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ] ; then
@@ -110,6 +113,34 @@ install_success() {
     status 'Install complete. Run "ollama" from the command line.'
 }
 trap install_success EXIT
+
+
+check_gpu() {
+    # Look for devices based on vendor ID for NVIDIA and AMD
+    case $1 in
+        lspci)
+            case $2 in
+                nvidia) available lspci && lspci -d '10de:' | grep -q 'NVIDIA' || return 1 ;;
+                amdgpu) available lspci && lspci -d '1002:' | grep -q 'AMD' || return 1 ;;
+                intelgpu) available lspci && lspci -d '8086:' | grep -q 'Intel' || return 1 ;;
+            esac ;;
+        lshw)
+            case $2 in
+                nvidia) available lshw && $SUDO lshw -c display -numeric -disable network | grep -q 'vendor: .* \[10DE\]' || return 1 ;;
+                amdgpu) available lshw && $SUDO lshw -c display -numeric -disable network | grep -q 'vendor: .* \[1002\]' || return 1 ;;
+                intelgpu) available lshw && $SUDO lshw -c display -numeric -disable network | grep -q 'vendor: .* \[8086\]' || return 1 ;;
+            esac ;;
+        nvidia-smi) available nvidia-smi || return 1 ;;
+    esac
+}
+
+is_intel_gpu() {
+    if check_gpu lspci intelgpu || check_gpu lshw intelgpu; then
+        echo 1
+    else
+        echo 0
+    fi
+}
 
 # Everything from this point onwards is optional.
 
@@ -144,9 +175,28 @@ Restart=always
 RestartSec=3
 Environment="PATH=$PATH"
 
+#Environment="https_proxy=http://proxy.xxx.yyy:8080"
+#Environment="OLLAMA_DEBUG=1"
+
 [Install]
 WantedBy=default.target
 EOF
+
+    Use_Intel_GPU="$(is_intel_gpu)"
+    if [ ${Use_Intel_GPU} -eq 1 ]; then
+        status "Set for Intel GPU"
+        if [ -z ${LD_LIBRARY_PATH+x} ]; then
+            LD_LIBRARY_PATH="${OLLAMA_INSTALL_DIR}/lib/ollama:${OLLAMA_INSTALL_DIR}/lib/ollama/sycl"
+        else
+            LD_LIBRARY_PATH="${OLLAMA_INSTALL_DIR}/lib/ollama:${OLLAMA_INSTALL_DIR}/lib/ollama/sycl:$LD_LIBRARY_PATH"
+        fi
+        $SUDO sed -i '/\[Install\]/i Environment="LD_LIBRARY_PATH='"${LD_LIBRARY_PATH}"'"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i Environment="ONEAPI_DEVICE_SELECTOR=level_zero:0"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i Environment="ZES_ENABLE_SYSMAN=1"' /etc/systemd/system/ollama.service
+        $SUDO sed -i '/\[Install\]/i #Environment="OLLAMA_DISABLE_INTEL_GPU=1"' /etc/systemd/system/ollama.service
+
+    fi
+
     SYSTEMCTL_RUNNING="$(systemctl is-system-running || true)"
     case $SYSTEMCTL_RUNNING in
         running|degraded)
@@ -166,22 +216,27 @@ EOF
     esac
 }
 
-if available systemctl; then
-    configure_systemd
-fi
-
 # WSL2 only supports GPUs via nvidia passthrough
 # so check for nvidia-smi to determine if GPU is available
 if [ "$IS_WSL2" = true ]; then
     if available nvidia-smi && [ -n "$(nvidia-smi | grep -o "CUDA Version: [0-9]*\.[0-9]*")" ]; then
         status "Nvidia GPU detected."
+        if available systemctl; then
+            configure_systemd
+        fi
     fi
+
+    #todo for intel GPU
     install_success
     exit 0
 fi
 
 # Don't attempt to install drivers on Jetson systems
 if [ -f /etc/nv_tegra_release ] ; then
+    if available systemctl; then
+        configure_systemd
+    fi
+
     status "NVIDIA JetPack ready."
     install_success
     exit 0
@@ -193,31 +248,23 @@ if ! available lspci && ! available lshw; then
     exit 0
 fi
 
-check_gpu() {
-    # Look for devices based on vendor ID for NVIDIA and AMD
-    case $1 in
-        lspci)
-            case $2 in
-                nvidia) available lspci && lspci -d '10de:' | grep -q 'NVIDIA' || return 1 ;;
-                amdgpu) available lspci && lspci -d '1002:' | grep -q 'AMD' || return 1 ;;
-            esac ;;
-        lshw)
-            case $2 in
-                nvidia) available lshw && $SUDO lshw -c display -numeric -disable network | grep -q 'vendor: .* \[10DE\]' || return 1 ;;
-                amdgpu) available lshw && $SUDO lshw -c display -numeric -disable network | grep -q 'vendor: .* \[1002\]' || return 1 ;;
-            esac ;;
-        nvidia-smi) available nvidia-smi || return 1 ;;
-    esac
-}
-
 if check_gpu nvidia-smi; then
+    if available systemctl; then
+        configure_systemd
+    fi
+
     status "NVIDIA GPU installed."
     exit 0
 fi
 
-if ! check_gpu lspci nvidia && ! check_gpu lshw nvidia && ! check_gpu lspci amdgpu && ! check_gpu lshw amdgpu; then
+if ! check_gpu lspci nvidia && ! check_gpu lshw nvidia && ! check_gpu lspci amdgpu && ! check_gpu lshw amdgpu && \
+    ! check_gpu lspci intelgpu && ! check_gpu lshw intelgpu; then
+    if available systemctl; then
+        configure_systemd
+    fi
+
     install_success
-    warning "No NVIDIA/AMD GPU detected. Ollama will run in CPU-only mode."
+    warning "No NVIDIA/AMD/Intel GPU detected. Ollama will run in CPU-only mode."
     exit 0
 fi
 
@@ -226,10 +273,29 @@ if check_gpu lspci amdgpu || check_gpu lshw amdgpu; then
     curl --fail --show-error --location --progress-bar \
         "https://ollama.com/download/ollama-linux-${ARCH}-rocm.tgz${VER_PARAM}" | \
         $SUDO tar -xzf - -C "$OLLAMA_INSTALL_DIR"
-
+    if available systemctl; then
+        configure_systemd
+    fi
     install_success
     status "AMD GPU ready."
     exit 0
+fi
+
+if check_gpu lspci intelgpu || check_gpu lshw intelgpu; then
+    status "Downloading Linux SYCL ${ARCH} bundle"
+    curl --fail --show-error --location --progress-bar \
+        "${RELEASE_HOST_URL}/ollama-linux-${ARCH}-sycl.tgz${VER_PARAM}" | \
+        $SUDO tar -xzf - -C "$OLLAMA_INSTALL_DIR"
+    if available systemctl; then
+        configure_systemd
+    fi
+    install_success
+    status "Intel GPU ready."
+    exit 0
+fi
+
+if available systemctl; then
+    configure_systemd
 fi
 
 CUDA_REPO_ERR_MSG="NVIDIA GPU detected, but your OS and Architecture are not supported by NVIDIA.  Please install the CUDA driver manually https://docs.nvidia.com/cuda/cuda-installation-guide-linux/"
@@ -239,7 +305,6 @@ CUDA_REPO_ERR_MSG="NVIDIA GPU detected, but your OS and Architecture are not sup
 # ref: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#fedora
 install_cuda_driver_yum() {
     status 'Installing NVIDIA repository...'
-    
     case $PACKAGE_MANAGER in
         yum)
             $SUDO $PACKAGE_MANAGER -y install yum-utils

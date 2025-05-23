@@ -42,16 +42,15 @@ var NvcudaGlobs = []string{
 	"/usr/local/lib*/libcuda.so*",
 }
 
-var OneapiGlobs = []string{
-	"/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so*",
-	"/usr/lib*/libze_intel_gpu.so*",
+var SyclGlobs = []string{
+	"/usr/local/ollama/sycl/libggml-sycl.so*",
 }
 
 var (
 	CudartMgmtName = "libcudart.so*"
 	NvcudaMgmtName = "libcuda.so*"
 	NvmlMgmtName   = "" // not currently wired on linux
-	OneapiMgmtName = "libze_intel_gpu.so*"
+	SyclMgmtName = "libggml-sycl.so*"
 )
 
 func GetCPUMem() (memInfo, error) {
@@ -111,6 +110,7 @@ func GetCPUDetails() ([]CPU, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 	return linuxCPUDetails(file)
 }
 
@@ -168,13 +168,11 @@ func linuxCPUDetails(file io.Reader) ([]CPU, error) {
 	for id, s := range socketByID {
 		s.CoreCount = len(coreBySocket[id])
 		s.ThreadCount = 0
-		for _, tc := range threadsByCoreBySocket[id] {
-			s.ThreadCount += tc
-		}
 
 		// This only works if HT is enabled, consider a more reliable model, maybe cache size comparisons?
 		efficiencyCoreCount := 0
 		for _, threads := range threadsByCoreBySocket[id] {
+			s.ThreadCount += threads
 			if threads == 1 {
 				efficiencyCoreCount++
 			}

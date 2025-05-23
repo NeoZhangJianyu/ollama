@@ -8,6 +8,10 @@ To install Ollama, run the following command:
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
+### Intel GPU
+
+Intel GPU support is not merged to Ollama official release. Please refer to [Intel GPU](intel_gpu.md)
+
 ## Manual install
 
 > [!NOTE]

@@ -35,6 +35,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/ollama/ollama/envconfig"
 	_ "github.com/ollama/ollama/ml/backend/ggml/ggml/src/ggml-cpu"
 )
 
@@ -57,26 +58,20 @@ var OnceLoad = sync.OnceFunc(func() {
 		exe = "."
 	}
 
-	// PATH, LD_LIBRARY_PATH, and DYLD_LIBRARY_PATH are often
-	// set by the parent process, however, use a default value
-	// if the environment variable is not set.
-	var name, value string
+	var value string
 	switch runtime.GOOS {
 	case "darwin":
-		// On macOS, DYLD_LIBRARY_PATH is often not set, so
-		// we use the directory of the executable as the default.
-		name = "DYLD_LIBRARY_PATH"
 		value = filepath.Dir(exe)
 	case "windows":
-		name = "PATH"
 		value = filepath.Join(filepath.Dir(exe), "lib", "ollama")
 	default:
-		name = "LD_LIBRARY_PATH"
 		value = filepath.Join(filepath.Dir(exe), "..", "lib", "ollama")
 	}
 
-	paths, ok := os.LookupEnv(name)
+	// Avoid potentially loading incompatible GGML libraries
+	paths, ok := os.LookupEnv("OLLAMA_LIBRARY_PATH")
 	if !ok {
+		slog.Debug("OLLAMA_LIBRARY_PATH not set, falling back to default", "search", value)
 		paths = value
 	}
 
@@ -91,6 +86,10 @@ var OnceLoad = sync.OnceFunc(func() {
 
 		if abspath != filepath.Dir(exe) && !strings.Contains(abspath, filepath.FromSlash("lib/ollama")) {
 			slog.Debug("skipping path which is not part of ollama", "path", abspath)
+			continue
+		}
+
+		if envconfig.DisableIntelGPU() && strings.Contains(abspath, "sycl") {
 			continue
 		}
 

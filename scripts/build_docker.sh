@@ -33,3 +33,15 @@ if echo $PLATFORM | grep "amd64" > /dev/null; then
         -t ${FINAL_IMAGE_REPO}:$VERSION-rocm \
         .
 fi
+
+if echo $PLATFORM | grep "intel" > /dev/null; then
+
+    docker buildx build \
+        ${LOAD_OR_PUSH} \
+        --platform=linux/intel \
+        ${OLLAMA_COMMON_BUILD_ARGS} \
+        --build-arg FLAVOR=sycl \
+        -f Dockerfile \
+        -t ${FINAL_IMAGE_REPO}:$VERSION-sycl \
+        .
+fi

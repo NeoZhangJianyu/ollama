@@ -117,3 +117,35 @@ accessing the AMD GPU devices.  On the host system you can run
 
 ### Metal (Apple GPUs)
 Ollama supports GPU acceleration on Apple devices via the Metal API.
+
+## Intel GPU
+
+### Intel GPU
+
+Supports Intel GPU Family:
+
+- Intel Data Center Max Series
+- Intel Data Center Flex Series
+- Intel Arc Series: Axxx, Bxxx
+- Intel Built-in Arc GPU
+- Intel iGPU in Core CPU (11th Generation Core CPU and newer, refer to [oneAPI supported GPU](https://www.intel.com/content/www/us/en/developer/articles/system-requirements/intel-oneapi-base-toolkit-system-requirements.html#inpage-nav-1-1)).
+
+#### Verified devices
+
+| Intel GPU                     | Status  | Verified Model                        |
+|-------------------------------|---------|---------------------------------------|
+| Intel Data Center Max Series  | Support | Max 1550, 1100                        |
+| Intel Data Center Flex Series | Support | Flex 170                              |
+| Intel Arc Series              | Support | Arc 770, 730M, Arc A750               |
+| Intel built-in Arc GPU        | Support | built-in Arc GPU in Meteor Lake, Arrow Lake    |
+| Intel iGPU                    | Support | iGPU in 13700k,iGPU in 13400, i5-1250P, i7-1260P, i7-1165G7 |
+
+*Notes:*
+
+- **Memory**
+  - The device memory is a limitation when running a large model. The loaded model size, *`llm_load_tensors: buffer_size`*, is displayed in the log when running `./bin/llama-cli`.
+
+  - Please make sure the GPU shared memory from the host is large enough to account for the model's size. For e.g. the *llama-2-7b.Q4_0* requires at least 8.0GB for integrated GPU and 4.0GB for discrete GPU.
+
+- **Execution Unit (EU)**
+  - If the iGPU has less than 80 EUs, the inference speed will likely be too slow for practical use.

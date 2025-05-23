@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -24,7 +23,9 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/llm"
+	"github.com/ollama/ollama/logutil"
 	"github.com/ollama/ollama/ml"
 	"github.com/ollama/ollama/model"
 	"github.com/ollama/ollama/model/input"
@@ -34,14 +35,10 @@ import (
 	_ "github.com/ollama/ollama/model/models"
 )
 
-type contextList struct {
-	list []ml.Context
-}
-
 type Sequence struct {
 	// ctxs are used for allocating tensors that last the lifetime of the sequence, such as
 	// multimodal embeddings
-	ctxs *contextList
+	ctxs []ml.Context
 
 	// batch index
 	iBatch int
@@ -82,7 +79,7 @@ type Sequence struct {
 	// true if an embedding are to be returned instead of text generation
 	embeddingOnly bool
 
-	doneReason string
+	doneReason llm.DoneReason
 
 	// Metrics
 	startProcessingTime time.Time
@@ -115,16 +112,41 @@ func (s *Server) NewSequence(prompt string, images []llm.ImageData, params NewSe
 		params.numKeep = int32(len(inputs))
 	}
 
-	// TODO(jessegross): We should ensure that we always leave minBatch of context space to shift,
-	// otherwise we might truncate or split the batch against the model's wishes
-
 	// Ensure that at least 1 input can be discarded during shift
 	params.numKeep = min(params.numKeep, s.cache.numCtx-1)
 
 	if int32(len(inputs)) > s.cache.numCtx {
 		discard := int32(len(inputs)) - s.cache.numCtx
+		promptStart := params.numKeep + discard
+
+		// If we need to truncate in the middle of a unbreakable batch, remove the entire batch
+		sameBatch := 0
+		for i, inp := range inputs {
+			if sameBatch > 0 {
+				sameBatch--
+
+				if promptStart == int32(i) {
+					promptStart++
+				}
+			} else if promptStart == int32(i) {
+				break
+			}
+
+			if inp.SameBatch != 0 {
+				if int32(i) < params.numKeep {
+					return nil, fmt.Errorf("SameBatch may not be specified within numKeep (index: %v numKeep: %v SameBatch: %v)", i, params.numKeep, inp.SameBatch)
+				}
+
+				sameBatch = inp.SameBatch
+			}
+		}
+
+		if promptStart >= int32(len(inputs)) {
+			return nil, errors.New("entire prompt removed by truncation")
+		}
+
 		newInputs := inputs[:params.numKeep]
-		newInputs = append(newInputs, inputs[params.numKeep+discard:]...)
+		newInputs = append(newInputs, inputs[promptStart:]...)
 
 		slog.Warn("truncating input prompt", "limit", s.cache.numCtx, "prompt", len(inputs), "keep", params.numKeep, "new", len(newInputs))
 		inputs = newInputs
@@ -152,8 +174,10 @@ func (s *Server) NewSequence(prompt string, images []llm.ImageData, params NewSe
 // inputs processes the prompt and images into a list of inputs
 // by splitting the prompt on [img-<n>] tags, tokenizing text and
 // decoding images
-func (s *Server) inputs(prompt string, images []llm.ImageData) ([]input.Input, *contextList, error) {
+func (s *Server) inputs(prompt string, images []llm.ImageData) ([]input.Input, []ml.Context, error) {
 	var inputs []input.Input
+	var ctxs []ml.Context
+
 	var parts []string
 	var matches [][]string
 
@@ -166,13 +190,6 @@ func (s *Server) inputs(prompt string, images []llm.ImageData) ([]input.Input, *
 	} else {
 		parts = []string{prompt}
 	}
-
-	var contexts contextList
-	runtime.AddCleanup(&contexts, func(ctxs []ml.Context) {
-		for _, ctx := range ctxs {
-			ctx.Close()
-		}
-	}, contexts.list)
 
 	postTokenize := false
 	for i, part := range parts {
@@ -203,7 +220,8 @@ func (s *Server) inputs(prompt string, images []llm.ImageData) ([]input.Input, *
 			}
 
 			ctx := s.model.Backend().NewContext()
-			contexts.list = append(contexts.list, ctx)
+			runtime.SetFinalizer(ctx, func(c ml.Context) { c.Close() })
+			ctxs = append(ctxs, ctx)
 			imageEmbeddings, err := multimodalProcessor.EncodeMultimodal(ctx, images[imageIndex].Data)
 			if err != nil {
 				return nil, nil, err
@@ -226,7 +244,7 @@ func (s *Server) inputs(prompt string, images []llm.ImageData) ([]input.Input, *
 		}
 	}
 
-	return inputs, &contexts, nil
+	return inputs, ctxs, nil
 }
 
 type Server struct {
@@ -267,15 +285,12 @@ type Server struct {
 	// KV cache
 	cache *InputCache
 
+	// next sequence for prompt processing to avoid starvation
+	nextSeq int
+
 	// multimodalHash generates hashes for comparing equality
 	// of non-text data
 	multimodalHash maphash.Hash
-
-	// vocab is a llama.cpp vocab required for gammar-based
-	// constrained generation (json mode, structured outputs)
-	// TODO: this is temporary until Ollama sampling supports
-	// constrained generation
-	vocab *sample.Vocab
 }
 
 func (s *Server) allNil() bool {
@@ -313,7 +328,7 @@ func flushPending(seq *Sequence) bool {
 	}
 }
 
-func (s *Server) removeSequence(seqIndex int, reason string) {
+func (s *Server) removeSequence(seqIndex int, reason llm.DoneReason) {
 	seq := s.seqs[seqIndex]
 
 	flushPending(seq)
@@ -351,14 +366,19 @@ func (s *Server) processBatch() error {
 	var batchInputs []int32
 	var batch input.Batch
 
-	for i, seq := range s.seqs {
+	resumeSeq := -1
+	seqIdx := s.nextSeq - 1
+	for range s.seqs {
+		seqIdx = (seqIdx + 1) % len(s.seqs)
+		seq := s.seqs[seqIdx]
+
 		if seq == nil {
 			continue
 		}
 
 		// if past the num predict limit
 		if seq.numPredict > 0 && seq.numPredicted >= seq.numPredict {
-			s.removeSequence(i, "limit")
+			s.removeSequence(seqIdx, llm.DoneReasonLength)
 			continue
 		}
 
@@ -369,16 +389,23 @@ func (s *Server) processBatch() error {
 
 		batchSize := s.batchSize
 
-		for j, inp := range seq.inputs {
+		for i, inp := range seq.inputs {
 			// If we are required to put following inputs into a single batch then extend the
 			// batch size. Since we are only extending the size the minimum amount possible, this
-			// will cause a break if we have pending inputs.
+			// will cause a break if we have existing inputs.
 			minBatch := 1 + inp.SameBatch
 			if minBatch > batchSize {
 				batchSize = minBatch
 			}
 
-			if len(seq.pendingInputs)+minBatch > batchSize {
+			// Stop if the required batch would put us over the total batch size (including tokens
+			// added by other sequences). If we haven't been able to add anything yet then pick up
+			// here again for the next batch to avoid starvation, though we can opportunistically
+			// check if other sequences can still squeeze something in.
+			if len(batchInputs)+minBatch > batchSize {
+				if len(seq.pendingInputs) == 0 && resumeSeq == -1 {
+					resumeSeq = seqIdx
+				}
 				break
 			}
 
@@ -392,7 +419,15 @@ func (s *Server) processBatch() error {
 
 				err := s.cache.ShiftCacheSlot(seq.cache, seq.numKeep)
 				if err != nil {
-					return err
+					var reprocess *ErrReprocessInputs
+					if errors.As(err, &reprocess) {
+						// Prepend these inputs to the sequence's inputs queue for reprocessing
+						seq.inputs = append(reprocess.Inputs, seq.inputs...)
+						// Skip this sequence but continue processing the rest
+						continue
+					} else {
+						return err
+					}
 				}
 			}
 
@@ -405,13 +440,19 @@ func (s *Server) processBatch() error {
 			batch.Sequences = append(batch.Sequences, seq.cache.Id)
 
 			seq.iBatch = len(batch.Outputs)
-			if j+1 == len(seq.inputs) {
+			if i+1 == len(seq.inputs) {
 				batch.Outputs = append(batch.Outputs, int32(len(batchInputs)-1))
 			}
 			seq.pendingInputs = append(seq.pendingInputs, inp)
 		}
 
 		seq.inputs = seq.inputs[len(seq.pendingInputs):]
+	}
+
+	if resumeSeq != -1 {
+		s.nextSeq = resumeSeq
+	} else {
+		s.nextSeq = seqIdx + 1
 	}
 
 	if len(batchInputs) == 0 {
@@ -456,7 +497,7 @@ func (s *Server) processBatch() error {
 		if seq.embeddingOnly {
 			// TODO(jessegross): Embedding support
 			slog.Warn("generation of embedding outputs not yet supported")
-			s.removeSequence(i, "")
+			s.removeSequence(i, llm.DoneReasonStop)
 			continue
 		}
 
@@ -474,7 +515,7 @@ func (s *Server) processBatch() error {
 			// as it's important for the /api/generate context
 			// seq.responses <- piece
 
-			s.removeSequence(i, "stop")
+			s.removeSequence(i, llm.DoneReasonStop)
 			continue
 		}
 
@@ -510,7 +551,7 @@ func (s *Server) processBatch() error {
 			}
 			seq.cache.Inputs = seq.cache.Inputs[:tokenLen]
 
-			s.removeSequence(i, "stop")
+			s.removeSequence(i, llm.DoneReasonStop)
 			continue
 		}
 
@@ -523,7 +564,7 @@ func (s *Server) processBatch() error {
 		}
 
 		if !flushPending(seq) {
-			s.removeSequence(i, "connection")
+			s.removeSequence(i, llm.DoneReasonConnectionClosed)
 		}
 	}
 
@@ -552,14 +593,15 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var grammar *sample.Grammar
+	var grammar *sample.GrammarSampler
 	var err error
 	if req.Grammar != "" {
-		grammar, err = sample.NewGrammar(s.vocab, req.Grammar)
+		grammar, err = sample.NewGrammarSampler(s.model.(model.TextProcessor), req.Grammar)
 		if err != nil {
 			http.Error(w, "failed to load model vocabulary required for format", http.StatusInternalServerError)
 			return
 		}
+		defer grammar.Free()
 	}
 
 	sampler := sample.NewSampler(
@@ -588,7 +630,7 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, context.Canceled) {
 			slog.Info("aborting completion request due to client closing the connection")
 		} else {
-			slog.Error("Failed to acquire semaphore", "error", err)
+			http.Error(w, fmt.Sprintf("Failed to acquire semaphore: %v", err), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -600,6 +642,7 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 			seq.cache, seq.inputs, err = s.cache.LoadCacheSlot(seq.inputs)
 			if err != nil {
 				s.mu.Unlock()
+				s.seqsSem.Release(1)
 				http.Error(w, fmt.Sprintf("Failed to load cache: %v", err), http.StatusInternalServerError)
 				return
 			}
@@ -613,6 +656,7 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	if !found {
+		s.seqsSem.Release(1)
 		http.Error(w, "could not find an available sequence", http.StatusInternalServerError)
 		return
 	}
@@ -634,14 +678,9 @@ func (s *Server) completion(w http.ResponseWriter, r *http.Request) {
 
 				flusher.Flush()
 			} else {
-				// Send the final response
-				doneReason := "stop"
-				if seq.doneReason == "limit" {
-					doneReason = "length"
-				}
 				if err := json.NewEncoder(w).Encode(&llm.CompletionResponse{
 					Done:               true,
-					DoneReason:         doneReason,
+					DoneReason:         seq.doneReason,
 					PromptEvalCount:    seq.numPromptInputs,
 					PromptEvalDuration: seq.startGenerationTime.Sub(seq.startProcessingTime),
 					EvalCount:          seq.numPredicted,
@@ -677,6 +716,51 @@ func (m *multiLPath) String() string {
 	return strings.Join(*m, ", ")
 }
 
+func (s *Server) reserveWorstCaseGraph() error {
+	ctx := s.model.Backend().NewContext()
+	defer ctx.Close()
+
+	var batch input.Batch
+
+	inputs := make([]int32, s.batchSize)
+	batch.Positions = make([]int32, len(inputs))
+	batch.Sequences = make([]int, len(inputs))
+	for i := range inputs {
+		batch.Positions[i] = int32(i)
+	}
+
+	batch.Outputs = make([]int32, s.parallel)
+	for i := range batch.Outputs {
+		batch.Outputs[i] = int32(i)
+	}
+
+	var err error
+	batch.Inputs, err = ctx.Input().FromIntSlice(inputs, len(inputs))
+	if err != nil {
+		return err
+	}
+
+	cache := s.model.Config().Cache
+	if cache != nil {
+		err := cache.StartForward(ctx, batch, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	t, err := s.model.Forward(ctx, batch)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.Forward(t).Reserve()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *Server) loadModel(
 	ctx context.Context,
 	mpath string,
@@ -692,8 +776,6 @@ func (s *Server) loadModel(
 	if err != nil {
 		panic(err)
 	}
-
-	s.vocab = sample.NewVocab(mpath)
 
 	// TODO(jessegross): LoRA loading
 	if lpath.String() != "" {
@@ -714,6 +796,11 @@ func (s *Server) loadModel(
 	s.seqs = make([]*Sequence, s.parallel)
 	s.seqsSem = semaphore.NewWeighted(int64(s.parallel))
 
+	err = s.reserveWorstCaseGraph()
+	if err != nil {
+		panic(err)
+	}
+
 	s.status = llm.ServerStatusReady
 	s.ready.Done()
 }
@@ -730,9 +817,8 @@ func Execute(args []string) error {
 	kvCacheType := fs.String("kv-cache-type", "", "quantization type for KV cache (default: f16)")
 	port := fs.Int("port", 8080, "Port to expose the server on")
 	threads := fs.Int("threads", runtime.NumCPU(), "Number of threads to use during generation")
-	verbose := fs.Bool("verbose", false, "verbose output (default: disabled)")
+	_ = fs.Bool("verbose", false, "verbose output (default: disabled)")
 	_ = fs.Bool("no-mmap", false, "do not memory-map model (slower load but may reduce pageouts if not using mlock)")
-	_ = fs.Bool("mlock", false, "force system to keep model in RAM rather than swapping or compressing")
 	tensorSplit := fs.String("tensor-split", "", "fraction of the model to offload to each GPU, comma-separated list of proportions")
 	multiUserCache := fs.Bool("multiuser-cache", false, "optimize input cache algorithm for multiple users")
 
@@ -746,22 +832,7 @@ func Execute(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	level := slog.LevelInfo
-	if *verbose {
-		level = slog.LevelDebug
-	}
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level:     level,
-		AddSource: true,
-		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
-			if attr.Key == slog.SourceKey {
-				source := attr.Value.Any().(*slog.Source)
-				source.File = filepath.Base(source.File)
-			}
-			return attr
-		},
-	})
-	slog.SetDefault(slog.New(handler))
+	slog.SetDefault(logutil.NewLogger(os.Stderr, envconfig.LogLevel()))
 	slog.Info("starting ollama engine")
 
 	server := &Server{

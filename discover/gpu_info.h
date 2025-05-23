@@ -27,12 +27,14 @@
 
 #endif
 
+#ifndef LOG
 #define LOG(verbose, ...) \
   do { \
     if (verbose) { \
       fprintf(stderr, __VA_ARGS__); \
     } \
   } while (0)
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,7 +66,7 @@ void cpu_check_ram(mem_info_t *resp);
 #include "gpu_info_cudart.h"
 #include "gpu_info_nvcuda.h"
 #include "gpu_info_nvml.h"
-#include "gpu_info_oneapi.h"
+#include "gpu_info_sycl.h"
 
 #endif  // __GPU_INFO_H__
 #endif  // __APPLE__
