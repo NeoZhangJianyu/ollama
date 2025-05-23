@@ -644,7 +644,7 @@ func loadNVMLMgmt(nvmlLibPaths []string) (*C.nvml_handle_t, string, error) {
 // Returns: num devices, sycl_init_resp_t, libPath, error
 func loadSyclMgmt(syclLibPaths []string) (int, *C.sycl_init_resp_t, string, error) {
 	var resp C.sycl_init_resp_t
-	var num_devices = 0
+	num_devices := 0
 	resp.oh.verbose = getVerboseState()
 	var err error
 	for _, libPath := range syclLibPaths {
