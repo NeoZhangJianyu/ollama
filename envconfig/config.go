@@ -289,9 +289,7 @@ func AsMap() map[string]EnvVar {
 		ret["GPU_DEVICE_ORDINAL"] = EnvVar{"GPU_DEVICE_ORDINAL", GpuDeviceOrdinal(), "Set which AMD devices are visible by numeric ID"}
 		ret["HSA_OVERRIDE_GFX_VERSION"] = EnvVar{"HSA_OVERRIDE_GFX_VERSION", HsaOverrideGfxVersion(), "Override the gfx used for all detected AMD GPUs"}
 		ret["OLLAMA_DISABLE_INTEL_GPU"] = EnvVar{"OLLAMA_DISABLE_INTEL_GPU", DisableIntelGPU(), "Disable Intel GPU detection"}
-
 	}
-
 	return ret
 }
 

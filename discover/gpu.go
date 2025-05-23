@@ -644,7 +644,6 @@ func loadNVMLMgmt(nvmlLibPaths []string) (*C.nvml_handle_t, string, error) {
 // Returns: num devices, sycl_init_resp_t, libPath, error
 func loadSyclMgmt(syclLibPaths []string) (int, *C.sycl_init_resp_t, string, error) {
 	var resp C.sycl_init_resp_t
-	num_devices := 0
 	resp.oh.verbose = getVerboseState()
 	var err error
 	for _, libPath := range syclLibPaths {
@@ -657,7 +656,7 @@ func loadSyclMgmt(syclLibPaths []string) (int, *C.sycl_init_resp_t, string, erro
 			C.free(unsafe.Pointer(resp.err))
 		} else {
 			err = nil
-			num_devices = int(C.sycl_get_device_count(&resp))
+			num_devices := int(C.sycl_get_device_count(&resp))
 			return num_devices, &resp, libPath, err
 		}
 	}

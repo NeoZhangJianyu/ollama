@@ -1,12 +1,12 @@
 package discover
 
 import (
+	"log/slog"
 	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
 )
 
 func TestBasicGetGPUInfo(t *testing.T) {
@@ -64,4 +64,5 @@ func TestGetVisibleDevicesEnv(t *testing.T) {
 	name, val := gpus.GetVisibleDevicesEnv()
 	slog.Info("TestGetVisibleDevicesEnv", "name", name, "val", val)
 }
+
 // TODO - add some logic to figure out card type through other means and actually verify we got back what we expected

@@ -183,14 +183,12 @@ jobs:
       # don't abuse go generate on specific platforms.
       - name: check that 'go generate' is clean
         if: always()
-        cache: false
         run: |
           go generate ./...
           git diff --name-only --exit-code || (echo "Please run 'go generate ./...'." && exit 1)
 
       - name: go test
         if: always()
-        cache: false
         run: go test -count=1 -benchtime=1x ./...
 
       # TODO(bmizerany): replace this heavy tool with just the
