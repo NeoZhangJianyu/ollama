@@ -2,8 +2,9 @@ name: release
 
 on:
   push:
-    branch:
-      - 'development'
+    tags:
+      - 'v*'
+      - 'tmp*'
 
 env:
   CGO_CFLAGS: '-O3'
