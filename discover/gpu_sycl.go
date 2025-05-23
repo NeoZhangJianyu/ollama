@@ -16,7 +16,7 @@ func syclGetVisibleDevicesEnv(gpuInfo []GpuInfo) (string, string) {
 	}
 
 	ids := []string{}
-	slog.Info("gpuinfo","len", len(gpuInfo))
+	slog.Info("gpuinfo", "len", len(gpuInfo))
 	for _, info := range gpuInfo {
 		if info.Library != "sycl" {
 			// TODO shouldn't happen if things are wired correctly...

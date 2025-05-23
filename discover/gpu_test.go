@@ -1,12 +1,12 @@
 package discover
 
 import (
+        "github.com/stretchr/testify/assert"
+        "github.com/stretchr/testify/require"
+        "log/slog"
+
 	"runtime"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"log/slog"
 )
 
 func TestBasicGetGPUInfo(t *testing.T) {
