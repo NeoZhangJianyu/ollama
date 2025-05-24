@@ -95,7 +95,7 @@ if (DEFINED ENV{ONEAPI_ROOT})
         install(TARGETS ggml-sycl
             RUNTIME_DEPENDENCIES
                 DIRECTORIES ${TBBROOT}/lib/ ${DNNLROOT}/lib ${MKLROOT}/lib ${CMPLR_ROOT}/lib  ${UMF_ROOT}/lib
-                PRE_INCLUDE_REGEXES  hwloc dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
+                PRE_INCLUDE_REGEXES  dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
                 PRE_EXCLUDE_REGEXES ".*"
                 POST_EXCLUDE_REGEXES
                     [=[.*system32\/.*\.dll]=]
@@ -120,6 +120,11 @@ if (DEFINED ENV{ONEAPI_ROOT})
             DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
             FOLLOW_SYMLINK_CHAIN
           )
+	file(COPY
+            ${CMPLR_ROOT}/lib/libhwloc.so.15
+            DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+            FOLLOW_SYMLINK_CHAIN
+        )
         file(COPY
           ${UMF_ROOT}/lib/libumf.so
           DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
