@@ -15,7 +15,7 @@ TEMP_DIR=$(mktemp -d)
 cleanup() { rm -rf $TEMP_DIR; }
 trap cleanup EXIT
 
-default_rel_tag=v0.0.1
+default_rel_tag=v0.0.2
 
 if [ $# -gt 0 ]; then
     rel_tag=$1
