@@ -47,6 +47,10 @@ Platform #0: Intel(R) OpenCL HD Graphics
 git clone https://github.com/NeoZhangJianyu/ollama
 cd ollama
 ./script/install.sh
+
+or
+
+./script/install.sh tag (Like v0.0.1)
 ```
 
 You will see following log if everything is OK:
