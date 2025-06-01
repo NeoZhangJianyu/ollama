@@ -47,8 +47,6 @@ jobs:
     environment: release
     env:
       GOFLAGS: ${{ needs.setup-environment.outputs.GOFLAGS }}
-      ONEAPI_ROOT: "C:\Program Files (x86)\Intel\oneAPI"
-
     steps:
       - name: Install system dependencies
         run: |
