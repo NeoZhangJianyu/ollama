@@ -2,8 +2,8 @@ name: release
 
 on:
   pull_request:
-    branches: [main]
-    
+    types: [opened, reopened]
+    branches: [main]    
   push:
     tags:
       - 'v*'
