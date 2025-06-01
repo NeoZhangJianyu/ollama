@@ -163,28 +163,18 @@ function buildOllama() {
             }
             write-host "call `"$script:ONEAPI_DIR\setvars.bat`" && powershell"
             #cmd.exe "/K" "`"$script:ONEAPI_DIR\setvars.bat`" && powershell"
-            #cmd.exe "/c" "`"$script:ONEAPI_DIR\setvars.bat`" && powershell"
             #if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
             write-host "set to build SYCL backend"
 
             del .\build\CMakeCache.txt
-            #cmake -B build -G "Ninja" -DLLAMA_CURL=OFF -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_BACKEND_DL=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx -DCMAKE_BUILD_TYPE=Release
+            & cmake -B build -G "Ninja" -DLLAMA_CURL=OFF -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_BACKEND_DL=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx -DCMAKE_BUILD_TYPE=Release
             if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
 
-            #& cmake --build build --config Release -j
+            & cmake --build build --config Release -j
             if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
-            #& cmake --install build --component "SYCL" --strip
 
-            & cmake --preset 'SYCL' -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL
-			if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
-			
-            & cmake --build --parallel --preset 'SYCL'
-			if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
-			
-            & cmake --install build --component SYCL --strip --parallel 8
-			if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
-
-            if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+			write-host "cp sycl folder to dist"
+			copy-item -path "C:\Program Files (x86)\Ollama\lib\ollama\sycl" -destination "${script:DIST_DIR}\lib\ollama\"  -Recurse -Force
         }
     }
     write-host "Building ollama CLI"
@@ -293,11 +283,7 @@ function distZip() {
         if (Test-Path -Path "${script:SRC_DIR}\dist\windows-amd64-rocm") {
             Move-Item -destination "${script:SRC_DIR}\dist\windows-amd64\lib\ollama\rocm" -path "${script:SRC_DIR}\dist\windows-amd64-rocm\lib\ollama"
         }
-
-        if (Test-Path -Path "${script:SRC_DIR}\dist\windows-amd64-sycl") {
-            Move-Item -destination "${script:SRC_DIR}\dist\windows-amd64\lib\ollama\sycl" -path "${script:SRC_DIR}\dist\windows-amd64-sycl\lib\ollama"
-        }
-    }
+     }
 
     if (Test-Path -Path "${script:SRC_DIR}\dist\windows-arm64") {
         write-host "Generating stand-alone distribution zip file ${script:SRC_DIR}\dist\ollama-windows-arm64.zip"
