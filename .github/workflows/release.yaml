@@ -176,6 +176,7 @@ jobs:
           Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.arm64.exe" -OutFile "dist\windows-arm64\vc_redist.arm64.exe"
       - run: |
           $env:VERSION='${{ github.ref_name }}' -Replace "v(.*)", '$1'
+          & cmd /c "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64 --force
           & .\scripts\build_windows.ps1 buildApp
         env:
           VCToolsRedistDir: stub
@@ -217,6 +218,7 @@ jobs:
           path: dist\windows-amd64\
           merge-multiple: true
       - run: |
+          & cmd /c "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64 --force
           & .\scripts\build_windows.ps1 gatherDependencies sign buildInstaller distZip
         env:
           KEY_CONTAINER: ${{ vars.KEY_CONTAINER }}
