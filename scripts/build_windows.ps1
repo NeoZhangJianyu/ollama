@@ -37,7 +37,23 @@ function checkEnv() {
     } else {
         $script:CUDA_DIRS=$cudaList
     }
-    
+
+    # Locate oneAPI versions
+    # Note: this assumes every version found will be built
+    $oneAPIList=(get-item "C:\Program Files (x86)\Intel\oneAPI\" -ea 'silentlycontinue')
+
+    if ($oneAPIList.length -eq 0) {
+        $d=(get-command -ea 'silentlycontinue' icpx).path
+        if ($null -ne $d) {
+            $script:ONEAPI_DIR=@($d| split-path -parent)
+        }
+    } else {
+        $script:ONEAPI_DIR=$oneAPIList
+    }
+
+    Write-host "find oneapi ${script:ONEAPI_DIR}"
+
+
     $inoSetup=(get-item "C:\Program Files*\Inno Setup*\")
     if ($inoSetup.length -gt 0) {
         $script:INNO_SETUP_DIR=$inoSetup[0]
@@ -80,6 +96,7 @@ function checkEnv() {
 
 
 function buildOllama() {
+    Write-host "build Ollama"
     mkdir -Force -path "${script:DIST_DIR}\"
     if ($script:ARCH -ne "arm64") {
         Remove-Item -ea 0 -recurse -force -path "${script:SRC_DIR}\dist\windows-${script:ARCH}"
@@ -92,6 +109,7 @@ function buildOllama() {
         & cmake --install build --component CPU --strip
         if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
 
+        Write-host "build backend"
         $hashEnv = @{}
         Get-ChildItem env: | foreach { $hashEnv[$_.Name] = $_.Value }
         if ("$script:CUDA_DIRS".Contains("v11")) {
@@ -136,6 +154,28 @@ function buildOllama() {
             if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
             & cmake --install build --component "HIP" --strip
             if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+        }
+        write-host "Check oneapi path: $script:ONEAPI_DIR"
+        if ($script:ONEAPI_DIR) {
+            write-host "Building SYCL backend libraries"
+            if (-Not (get-command -ErrorAction silent ninja)) {
+                $NINJA_DIR=(gci -path (Get-CimInstance MSFT_VSInstance -Namespace root/cimv2/vs)[0].InstallLocation -r -fi ninja.exe).Directory.FullName
+                $env:PATH="$NINJA_DIR;$env:PATH"
+            }
+            write-host "call `"$script:ONEAPI_DIR\setvars.bat`" && powershell"
+            #cmd.exe "/K" "`"$script:ONEAPI_DIR\setvars.bat`" && powershell"
+            #if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+            write-host "set to build SYCL backend"
+
+            del .\build\CMakeCache.txt
+            & cmake -B build -G "Ninja" -DLLAMA_CURL=OFF -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_BACKEND_DL=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx -DCMAKE_BUILD_TYPE=Release
+            if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+
+            & cmake --build build --config Release -j
+            if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+
+			write-host "cp sycl folder to dist"
+			copy-item -path "C:\Program Files (x86)\Ollama\lib\ollama\sycl" -destination "${script:DIST_DIR}\lib\ollama\"  -Recurse -Force
         }
     }
     write-host "Building ollama CLI"
@@ -227,6 +267,16 @@ function distZip() {
             Write-Output "Extract this ROCm zip file to the same location where you extracted ollama-windows-amd64.zip" > "${script:SRC_DIR}\dist\windows-amd64-rocm\README.txt"
             Move-Item -path "${script:SRC_DIR}\dist\windows-amd64\lib\ollama\rocm" -destination "${script:SRC_DIR}\dist\windows-amd64-rocm\lib\ollama"
             Compress-Archive -CompressionLevel Optimal -Path "${script:SRC_DIR}\dist\windows-amd64-rocm\*" -DestinationPath "${script:SRC_DIR}\dist\ollama-windows-amd64-rocm.zip" -Force
+        }
+
+        if (Test-Path -Path "${script:SRC_DIR}\dist\windows-amd64\lib\ollama\sycl") {
+            write-host "Generating stand-alone distribution zip file ${script:SRC_DIR}\dist\ollama-windows-amd64-sycl.zip"
+            # Temporarily adjust paths so we can retain the same directory structure
+            Remove-Item -ea 0 -r "${script:SRC_DIR}\dist\windows-amd64-sycl"
+            mkdir -Force -path "${script:SRC_DIR}\dist\windows-amd64-sycl\lib\ollama"
+            Write-Output "Extract this sycl zip file to the same location where you extracted ollama-windows-amd64.zip" > "${script:SRC_DIR}\dist\windows-amd64-sycl\README.txt"
+            Move-Item -path "${script:SRC_DIR}\dist\windows-amd64\lib\ollama\sycl" -destination "${script:SRC_DIR}\dist\windows-amd64-sycl\lib\ollama"
+            Compress-Archive -CompressionLevel Optimal -Path "${script:SRC_DIR}\dist\windows-amd64-sycl\*" -DestinationPath "${script:SRC_DIR}\dist\ollama-windows-amd64-sycl.zip" -Force
         }
 
         write-host "Generating stand-alone distribution zip file ${script:SRC_DIR}\dist\ollama-windows-amd64.zip"
