@@ -39,7 +39,7 @@ jobs:
             sycl-version: '2025.1.3'
 
 
-    runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
+    runs-on: windows-2022
     environment: release
     env:
       GOFLAGS: ${{ needs.setup-environment.outputs.GOFLAGS }}
@@ -132,7 +132,7 @@ jobs:
       matrix:
         os: [windows]
         arch: [amd64]
-    runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
+    runs-on: windows-2022
     environment: release
     needs: [setup-environment]
     env:
