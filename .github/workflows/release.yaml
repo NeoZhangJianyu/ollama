@@ -68,8 +68,8 @@ jobs:
       - if: startsWith(matrix.preset, 'SYCL')
         name: Install oneAPI ${{ matrix.sycl-version }}
         run: |           
-          echo "CC=$ONEAPI_ROOT\compiler\latest\bin\icx.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "CXX=$ONEAPI_ROOT\compiler\latest\bin\icx.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "CC=${{ env.ONEAPI_ROOT }}\compiler\latest\bin\icx.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "CXX=${{ env.ONEAPI_ROOT }}\compiler\latest\bin\icx.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - if: matrix.preset == 'CPU'
         run: |
