@@ -53,8 +53,8 @@ jobs:
         name: Install oneAPI ${{ matrix.sycl-version }}
         run: |
           $ErrorActionPreference = "Stop"
-          if ("${{ steps.cache-install.outputs.cache-hit }}" -ne 'true') {
-            Invoke-WebRequest -Uri "${{ matrix.install }}"  -Verbose -OutFile "install.exe"
+          if ("${{ steps.cache-install.outputs.cache-hit }}" -ne 'true') {            
+            curl.ext "${{ matrix.install }}"  -o "install.exe"            
             Start-Process -FilePath .\install.exe -ArgumentList '-install' -NoNewWindow -Wait
           }
 
