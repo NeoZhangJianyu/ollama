@@ -55,7 +55,7 @@ jobs:
           
       - name: Install
         run:  |
-          scripts/install-oneapi.bat $WINDOWS_BASEKIT_URL $WINDOWS_DPCPP_MKL
+          cmd /c scripts\install-oneapi.bat $WINDOWS_BASEKIT_URL $WINDOWS_DPCPP_MKL
           
       - if: startsWith(matrix.preset, 'SYCL')
         name: Install oneAPI ${{ matrix.sycl-version }}
