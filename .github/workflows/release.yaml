@@ -48,19 +48,10 @@ jobs:
       ONEAPI_ROOT: "C:/Program Files (x86)/Intel/oneAPI"
       
     steps:
-    
-      - name: ccache
-        uses: hendrikmuhs/ccache-action@v1.2.16
-        with:
-          key: windows-depends
-          variant: sccache
-          evict-old-files: 1d
-          
       - name: Install system dependencies
         run: |
           choco install -y --no-progress ccache ninja
           ccache -o cache_dir=${{ github.workspace }}\.ccache
-          
           
       - name: Install
         run:  |
