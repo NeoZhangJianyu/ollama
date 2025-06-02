@@ -54,8 +54,11 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           if ("${{ steps.cache-install.outputs.cache-hit }}" -ne 'true') {            
-            curl.exe "${{ matrix.install }}"  -o "install.exe"            
-            Start-Process -FilePath .\install.exe -ArgumentList '-install' -NoNewWindow -Wait
+            curl.exe "${{ matrix.install }}"  -o "install.exe" 
+            echo "Download oneAPI package is done"
+            echo "Install oneAPI"
+            Start-Process -FilePath .\install.exe -NoNewWindow -Wait
+            echo "Install oneAPI is done"            
           }
 
           $oneAPIPath = (Resolve-Path "C:\Program Files (x86)\Intel\oneAPI\*").path
