@@ -48,12 +48,13 @@ jobs:
       ONEAPI_ROOT: "C:/Program Files (x86)/Intel/oneAPI"
       
     steps:
+    
       - name: Install system dependencies
         run: |
           choco install -y --no-progress ccache ninja
           ccache -o cache_dir=${{ github.workspace }}\.ccache
           
-       - name: Clone
+      - name: Clone
         id: checkout
         uses: actions/checkout@v4
         with:
