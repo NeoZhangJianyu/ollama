@@ -53,14 +53,20 @@ jobs:
           choco install -y --no-progress ccache ninja
           ccache -o cache_dir=${{ github.workspace }}\.ccache
           
+       - name: Clone
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Install
+        shell: bash
         run:  |
-          cmd /c scripts\install-oneapi.bat $WINDOWS_BASEKIT_URL $WINDOWS_DPCPP_MKL
+          scripts/install-oneapi.bat $WINDOWS_BASEKIT_URL $WINDOWS_DPCPP_MKL
           
       - if: startsWith(matrix.preset, 'SYCL')
         name: Install oneAPI ${{ matrix.sycl-version }}
-        run: |
-          scripts/install-oneapi.bat $WINDOWS_BASEKIT_URL $WINDOWS_DPCPP_MKL  
+        run: |           
           echo "CC=$ONEAPI_ROOT\compiler\latest\bin\icx.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "CXX=$ONEAPI_ROOT\compiler\latest\bin\icx.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
 
