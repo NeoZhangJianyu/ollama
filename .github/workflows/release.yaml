@@ -57,7 +57,8 @@ jobs:
             Invoke-WebRequest -Uri "${{ matrix.install }}" -OutFile "install.exe"
             echo "Download oneAPI package is done"
             echo "Install oneAPI"
-            Start-Process -FilePath install.exe  -ArgumentList "-s","-a","--silent","--eula accept" -NoNewWindow -Wait
+            Execute-Process -Path .\install.exe -Parameters "--silent --eula accept --intel-sw-improvement-program-consent decline " -WindowStyle Hidden
+                    
             echo "Install oneAPI is done"            
           }
 
