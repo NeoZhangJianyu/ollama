@@ -54,10 +54,10 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           if ("${{ steps.cache-install.outputs.cache-hit }}" -ne 'true') {            
-            curl.exe "${{ matrix.install }}"  -o "install.exe" 
+            Invoke-WebRequest -Uri "${{ matrix.install }}" -OutFile "install.exe"
             echo "Download oneAPI package is done"
             echo "Install oneAPI"
-            Start-Process -FilePath .\install.exe -NoNewWindow -Wait
+            Start-Process -FilePath .\install.exe  -ArgumentList "-s -a --silent --eula accept" -NoNewWindow -Wait
             echo "Install oneAPI is done"            
           }
 
