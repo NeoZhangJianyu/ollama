@@ -57,6 +57,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2.16
+        with:
+          key: windows-depends
+          variant: sccache
+          evict-old-files: 1d
+
       - name: Install
         shell: bash
         run:  |
