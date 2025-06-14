@@ -127,7 +127,7 @@ jobs:
         run: |
           $env:VERSION='${{ github.ref_name }}' -Replace "v(.*)", '$1'
           & cmd /c "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64 --force
-          & .\scripts\build_windows.ps1 buildApp
+          & .\scripts\build_windows.ps1 buildOllama buildApp
         env:
           VCToolsRedistDir: stub
       - uses: actions/upload-artifact@v4
