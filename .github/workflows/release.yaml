@@ -218,7 +218,7 @@ jobs:
 
   # Aggregate all the assets and ship a release
   release:
-    needs: [linux-build]
+    needs: [linux-build,windows-publish]
     runs-on: ubuntu-22.04
     environment: release
     permissions:
