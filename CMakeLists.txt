@@ -85,16 +85,21 @@ if (DEFINED ENV{ONEAPI_ROOT})
         set(UMF_ROOT "$ENV{UMF_ROOT}")
 
         #message(STATUS ${MKLROOT}/lib)
-        # message(STATUS ${DNNLROOT}/lib)
-        # message(STATUS ${TBBROOT}/lib)
-
-        # message(STATUS "$ENV{LD_LIBRARY_PATH}")
+        #message(STATUS ${DNNLROOT}/lib)
+        #message(STATUS ${TBBROOT}/lib)
+        #message(STATUS "$ENV{LD_LIBRARY_PATH}")
 
         set(OLLAMA_SYCL_INSTALL_DIR ${OLLAMA_INSTALL_DIR}/sycl)
 
+        IF (WIN32)
+            set(FILE_FOLDER "bin")
+        ELSE()
+            set(FILE_FOLDER "lib")
+        ENDIF()
+
         install(TARGETS ggml-sycl
             RUNTIME_DEPENDENCIES
-                DIRECTORIES ${TBBROOT}/lib/ ${DNNLROOT}/lib ${MKLROOT}/lib ${CMPLR_ROOT}/lib  ${UMF_ROOT}/lib
+                DIRECTORIES ${TBBROOT}/${FILE_FOLDER} ${DNNLROOT}/${FILE_FOLDER} ${MKLROOT}/${FILE_FOLDER} ${CMPLR_ROOT}/${FILE_FOLDER}  ${UMF_ROOT}/${FILE_FOLDER}
                 PRE_INCLUDE_REGEXES  dnnl mkl_sycl_blas mkl_intel_ilp64 mkl_tbb_thread mkl_core sycl imf svml irng  intlc ur_loader
                 PRE_EXCLUDE_REGEXES ".*"
                 POST_EXCLUDE_REGEXES
@@ -104,38 +109,40 @@ if (DEFINED ENV{ONEAPI_ROOT})
             LIBRARY DESTINATION ${OLLAMA_SYCL_INSTALL_DIR} COMPONENT SYCL
             FRAMEWORK DESTINATION ${OLLAMA_SYCL_INSTALL_DIR} COMPONENT SYCL
         )
-
-        file(COPY
+        IF (WIN32)
+            #todo
+        ELSE()
+            file(COPY
                 ${TBBROOT}/lib/intel64/gcc4.8/libtbb.so
                 DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
                 FOLLOW_SYMLINK_CHAIN
-              )
-        file(COPY
-              ${CMPLR_ROOT}/lib/libur_adapter_level_zero.so
-              DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
-              FOLLOW_SYMLINK_CHAIN
             )
-        file(COPY
-            ${CMPLR_ROOT}/lib/libOpenCL.so
-            DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
-            FOLLOW_SYMLINK_CHAIN
-          )
-	file(COPY
-            ${CMPLR_ROOT}/lib/libhwloc.so.15
-            DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
-            FOLLOW_SYMLINK_CHAIN
-        )
-        file(COPY
-          ${UMF_ROOT}/lib/libumf.so
-          DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
-          FOLLOW_SYMLINK_CHAIN
-        )
-        file(COPY
-          ${UMF_ROOT}/lib/libdisjoint_pool.a
-          DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
-          FOLLOW_SYMLINK_CHAIN
-        )
-
+            file(COPY
+                ${CMPLR_ROOT}/lib/libur_adapter_level_zero.so
+                DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+                FOLLOW_SYMLINK_CHAIN
+            )
+            file(COPY
+                ${CMPLR_ROOT}/lib/libOpenCL.so
+                DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+                FOLLOW_SYMLINK_CHAIN
+              )
+            file(COPY
+                ${CMPLR_ROOT}/lib/libhwloc.so.15
+                DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+                FOLLOW_SYMLINK_CHAIN
+            )
+            file(COPY
+                ${UMF_ROOT}/lib/libumf.so
+                DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+                FOLLOW_SYMLINK_CHAIN
+            )
+            file(COPY
+                ${UMF_ROOT}/lib/libdisjoint_pool.a
+                DESTINATION ${OLLAMA_SYCL_INSTALL_DIR}
+                FOLLOW_SYMLINK_CHAIN
+            )
+        ENDIF()
 
     else()
         message(FATAL_ERROR, "C++ compiler lacks SYCL support.")

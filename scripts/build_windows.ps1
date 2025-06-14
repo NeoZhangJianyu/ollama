@@ -101,7 +101,6 @@ function buildOllama() {
     if ($script:ARCH -ne "arm64") {
         Remove-Item -ea 0 -recurse -force -path "${script:SRC_DIR}\dist\windows-${script:ARCH}"
         New-Item "${script:SRC_DIR}\dist\windows-${script:ARCH}\lib\ollama\" -ItemType Directory -ea 0
-
         & cmake --fresh --preset CPU --install-prefix $script:DIST_DIR
         if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
         & cmake --build --preset CPU  --config Release --parallel $script:JOBS
@@ -165,14 +164,27 @@ function buildOllama() {
             write-host "call `"$script:ONEAPI_DIR\setvars.bat`" && powershell"
             #cmd.exe "/K" "`"$script:ONEAPI_DIR\setvars.bat`" && powershell"
             #if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+            write-host "create target folder"
+            $SYCL_TARGET_FOLDER="C:\Program Files (x86)\Ollama\lib\ollama\sycl"
+            if (!(Test-Path -Path $SYCL_TARGET_FOLDER)) {
+                New-Item -ItemType Directory -Path $SYCL_TARGET_FOLDER
+                Write-Host "Folder '$SYCL_TARGET_FOLDER' created successfully."
+            } else {
+                Write-Host "Folder '$SYCL_TARGET_FOLDER' already exists."
+            }
+
             write-host "set to build SYCL backend"
 
             del .\build\CMakeCache.txt
             & cmake -B build -G "Ninja" -DLLAMA_CURL=OFF -DGGML_SYCL=ON -DGGML_SYCL_TARGET=INTEL -DGGML_BACKEND_DL=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icx -DCMAKE_BUILD_TYPE=Release
             if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
 
-            & cmake --build build --config Release -j
+            #& cmake --build build --config Release -j
+            #if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+
+            & cmake --build --preset "SYCL"  --config Release --parallel $script:JOBS
             if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
+            & cmake --install build --component "SYCL" --strip
 
 			write-host "cp sycl folder to dist"
 			copy-item -path "C:\Program Files (x86)\Ollama\lib\ollama\sycl" -destination "${script:DIST_DIR}\lib\ollama\"  -Recurse -Force
